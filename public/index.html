@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Industrial Parts Listing Assistant</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Listing Assistant</h1>
+    <p>Upload a part → Gemini drafts the listing → you review → push to eBay as a draft.</p>
+  </header>
+
+  <main>
+    <section id="upload-section">
+      <h2>New Part</h2>
+      <form id="upload-form">
+        <label>
+          Photo
+          <input type="file" id="photo-input" name="photo" accept="image/*" />
+        </label>
+        <label>
+          Notes / part number / spec sheet text (optional but helps accuracy)
+          <textarea id="notes-input" name="notes" rows="4" placeholder="e.g. Omron relay, pulled from line 3, model illegible on label but 24VDC coil, 8-pin"></textarea>
+        </label>
+        <button type="submit">Generate Listing</button>
+      </form>
+      <div id="upload-status"></div>
+    </section>
+
+    <section id="drafts-section">
+      <h2>Drafts</h2>
+      <div id="drafts-list"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
