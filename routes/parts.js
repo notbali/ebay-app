@@ -1,37 +1,40 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const db = require('../db');
-const { generateListing } = require('../services/geminiService');
-const { pushDraftListing, publishOffer } = require('../services/ebayService');
+const { generateListing } = require('../services/claudeService');
+const { publishListing } = require('../services/ebayService');
 
 const router = express.Router();
 
+const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
+
 const upload = multer({
   storage: multer.diskStorage({
-    destination: path.join(__dirname, '..', 'uploads'),
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+    destination: UPLOAD_DIR,
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`),
   }),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024, files: 12 }, // 10MB per file, up to 12 photos (eBay's per-listing limit)
 });
 
-// --- Create a new draft from a photo and/or notes ---
-router.post('/', upload.single('photo'), async (req, res) => {
+// --- Create a new draft from photo(s) and/or notes ---
+router.post('/', upload.array('photos', 12), async (req, res) => {
   try {
     const rawInput = req.body.notes || '';
-    const imagePath = req.file ? req.file.path : null;
+    const imagePaths = (req.files || []).map((f) => f.path);
 
-    const ai = await generateListing({ imagePath, rawInput });
+    const ai = await generateListing({ imagePaths, rawInput });
 
     const stmt = db.prepare(`
       INSERT INTO parts (
-        photo_path, raw_input, ai_part_number, ai_brand, ai_title, ai_description,
-        ai_price_low, ai_price_high, ai_specifics_json, ai_confidence, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
+        photo_paths_json, raw_input, ai_part_number, ai_brand, ai_title, ai_description,
+        ai_price_low, ai_price_high, ai_specifics_json, ai_confidence, ai_condition, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
     `);
 
     const info = stmt.run(
-      imagePath,
+      JSON.stringify(imagePaths),
       rawInput,
       ai.part_number,
       ai.brand,
@@ -40,7 +43,8 @@ router.post('/', upload.single('photo'), async (req, res) => {
       ai.price_low,
       ai.price_high,
       JSON.stringify(ai.specifics || {}),
-      ai.confidence
+      ai.confidence,
+      ai.condition
     );
 
     const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(info.lastInsertRowid);
@@ -64,9 +68,9 @@ router.get('/:id', (req, res) => {
   res.json(part);
 });
 
-// --- Edit a draft before pushing (seller review step) ---
+// --- Edit a draft before publishing (seller review step) ---
 router.put('/:id', (req, res) => {
-  const fields = ['ai_title', 'ai_description', 'ai_price_low', 'ai_price_high', 'ai_specifics_json'];
+  const fields = ['ai_title', 'ai_description', 'ai_price_low', 'ai_price_high', 'ai_specifics_json', 'ai_condition'];
   const updates = [];
   const values = [];
 
@@ -86,40 +90,77 @@ router.put('/:id', (req, res) => {
   res.json(part);
 });
 
-// --- Push a reviewed draft to eBay as an UNPUBLISHED offer ---
-router.post('/:id/push-to-ebay', async (req, res) => {
-  try {
-    const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
-    if (!part) return res.status(404).json({ error: 'Not found' });
+// --- Add more photos to an existing draft ---
+router.post('/:id/photos', upload.array('photos', 12), async (req, res) => {
+  const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  if (!part) return res.status(404).json({ error: 'Not found' });
 
-    const result = await pushDraftListing(part);
+  const existing = JSON.parse(part.photo_paths_json || '[]');
+  const added = (req.files || []).map((f) => f.path);
+  const combined = [...existing, ...added].slice(0, 12);
 
-    db.prepare(`
-      UPDATE parts SET status = 'pushed_to_ebay', ebay_sku = ?, ebay_offer_id = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(result.sku, result.offerId, req.params.id);
+  db.prepare('UPDATE parts SET photo_paths_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(JSON.stringify(combined), req.params.id);
 
-    res.json({ success: true, ...result });
-  } catch (err) {
-    console.error(err);
-    db.prepare(`UPDATE parts SET error_message = ? WHERE id = ?`).run(err.message, req.params.id);
-    res.status(500).json({ error: err.message });
-  }
+  const updated = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  res.json(updated);
 });
 
-// --- Explicit, separate step: actually make the eBay offer live ---
+// --- Remove one photo from a draft by index ---
+router.delete('/:id/photos/:index', (req, res) => {
+  const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  if (!part) return res.status(404).json({ error: 'Not found' });
+
+  const paths = JSON.parse(part.photo_paths_json || '[]');
+  const index = Number(req.params.index);
+  if (!Number.isInteger(index) || index < 0 || index >= paths.length) {
+    return res.status(400).json({ error: 'Invalid photo index' });
+  }
+
+  const [removed] = paths.splice(index, 1);
+  fs.unlink(removed, () => {}); // best-effort - don't fail the request if the file is already gone
+
+  db.prepare('UPDATE parts SET photo_paths_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(JSON.stringify(paths), req.params.id);
+
+  const updated = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  res.json(updated);
+});
+
+// --- Publish a reviewed draft live to eBay ---
+// One action: creates/updates the inventory item, creates/updates its offer (reusing an
+// existing offer if this part was already attempted before, so a retry after fixing an
+// error doesn't leave an orphaned duplicate), then publishes it. Review happens beforehand
+// in this dashboard - there is no intermediate "unpublished draft on eBay" step anymore,
+// since eBay's own UI doesn't surface that state anywhere useful.
 router.post('/:id/publish', async (req, res) => {
+  const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  if (!part) return res.status(404).json({ error: 'Not found' });
+
   try {
-    const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
-    if (!part || !part.ebay_offer_id) {
-      return res.status(400).json({ error: 'Push to eBay before publishing.' });
-    }
-    const result = await publishOffer(part.ebay_offer_id);
-    db.prepare(`UPDATE parts SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-      .run(req.params.id);
+    const result = await publishListing(part);
+
+    db.prepare(`
+      UPDATE parts SET status = 'published', ebay_sku = ?, ebay_offer_id = ?, ebay_listing_id = ?,
+        error_message = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(result.sku, result.offerId, result.listingId, req.params.id);
+
     res.json({ success: true, ...result });
   } catch (err) {
     console.error(err);
+
+    if (err.sku && err.offerId) {
+      // Item + offer exist on eBay even though publish itself failed - save them so the
+      // next attempt updates this same offer instead of creating another one.
+      db.prepare(`
+        UPDATE parts SET status = 'pushed_to_ebay', ebay_sku = ?, ebay_offer_id = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(err.sku, err.offerId, err.message, req.params.id);
+    } else {
+      db.prepare('UPDATE parts SET error_message = ? WHERE id = ?').run(err.message, req.params.id);
+    }
+
     res.status(500).json({ error: err.message });
   }
 });

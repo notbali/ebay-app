@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const path = require('path');
 
 const BASE_URL = process.env.EBAY_ENV === 'sandbox'
   ? 'https://api.sandbox.ebay.com'
@@ -41,22 +42,31 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-// Creates the inventory item + a draft offer. Deliberately does NOT call the
-// publishOffer endpoint, so the listing exists in Seller Hub as a draft only -
-// it will not go live until you explicitly publish it (in Seller Hub, or via
-// the separate /publish route below, which you trigger manually per listing).
-async function pushDraftListing(part) {
-  const token = await getAccessToken();
-  const sku = `IND-${part.id}-${Date.now()}`;
+// eBay fetches listing images itself from a public HTTPS URL - it can never reach localhost.
+function buildImageUrls(part) {
+  const photoPaths = JSON.parse(part.photo_paths_json || '[]');
+  if (photoPaths.length === 0) return [];
 
+  if (!process.env.PUBLIC_BASE_URL) {
+    throw new Error(
+      'PUBLIC_BASE_URL is not set in .env - eBay needs a public https URL to fetch photos from. ' +
+      'Run `ngrok http 3000` and paste the https URL it prints into PUBLIC_BASE_URL, then restart the server.'
+    );
+  }
+
+  const base = process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  return photoPaths.map((p) => `${base}/uploads/${path.basename(p)}`);
+}
+
+async function putInventoryItem(token, part, sku) {
   const specifics = JSON.parse(part.ai_specifics_json || '{}');
   const aspects = {};
   for (const [key, value] of Object.entries(specifics)) {
+    if (key.toLowerCase() === 'condition') continue; // condition is a structured field below, not a free-text aspect
     aspects[key] = [String(value)];
   }
 
-  // 1. Create/replace the inventory item
-  const invRes = await fetch(`${BASE_URL}/sell/inventory/v1/inventory_item/${sku}`, {
+  const res = await fetch(`${BASE_URL}/sell/inventory/v1/inventory_item/${sku}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -67,65 +77,79 @@ async function pushDraftListing(part) {
       availability: {
         shipToLocationAvailability: { quantity: 1 },
       },
-      condition: 'USED_EXCELLENT', // adjust per item as needed - see README
+      condition: part.ai_condition || 'USED_GOOD',
       product: {
         title: part.ai_title,
         description: part.ai_description,
         aspects,
         brand: part.ai_brand || undefined,
         mpn: part.ai_part_number || undefined,
+        imageUrls: buildImageUrls(part),
       },
     }),
   });
 
-  if (!invRes.ok) {
-    const errText = await invRes.text();
-    throw new Error(`eBay inventory item creation failed (${invRes.status}): ${errText}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`eBay inventory item creation failed (${res.status}): ${errText}`);
   }
-
-  // 2. Create a draft offer (unpublished - buyers cannot see this yet)
-  const offerRes = await fetch(`${BASE_URL}/sell/inventory/v1/offer`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      'Content-Language': 'en-US',
-    },
-    body: JSON.stringify({
-      sku,
-      marketplaceId: process.env.EBAY_MARKETPLACE_ID || 'EBAY_US',
-      format: 'FIXED_PRICE',
-      availableQuantity: 1,
-      categoryId: process.env.EBAY_CATEGORY_ID,
-      listingDescription: part.ai_description,
-      pricingSummary: {
-        price: {
-          value: part.ai_price_low ? String(part.ai_price_low) : '0.00',
-          currency: 'USD',
-        },
-      },
-      listingPolicies: {
-        fulfillmentPolicyId: process.env.EBAY_FULFILLMENT_POLICY_ID,
-        paymentPolicyId: process.env.EBAY_PAYMENT_POLICY_ID,
-        returnPolicyId: process.env.EBAY_RETURN_POLICY_ID,
-      },
-      merchantLocationKey: process.env.EBAY_MERCHANT_LOCATION_KEY,
-    }),
-  });
-
-  if (!offerRes.ok) {
-    const errText = await offerRes.text();
-    throw new Error(`eBay offer creation failed (${offerRes.status}): ${errText}`);
-  }
-
-  const offerData = await offerRes.json();
-  return { sku, offerId: offerData.offerId };
 }
 
-// Separate, explicit, one-at-a-time publish call. Only wire a button to this
-// once you've reviewed the draft in eBay Seller Hub or your own dashboard.
-async function publishOffer(offerId) {
-  const token = await getAccessToken();
+function offerBody(part, sku) {
+  return {
+    sku,
+    marketplaceId: process.env.EBAY_MARKETPLACE_ID || 'EBAY_US',
+    format: 'FIXED_PRICE',
+    availableQuantity: 1,
+    categoryId: process.env.EBAY_CATEGORY_ID,
+    listingDescription: part.ai_description,
+    pricingSummary: {
+      price: {
+        value: part.ai_price_low ? String(part.ai_price_low) : '0.00',
+        currency: 'USD',
+      },
+    },
+    listingPolicies: {
+      fulfillmentPolicyId: process.env.EBAY_FULFILLMENT_POLICY_ID,
+      paymentPolicyId: process.env.EBAY_PAYMENT_POLICY_ID,
+      returnPolicyId: process.env.EBAY_RETURN_POLICY_ID,
+    },
+    merchantLocationKey: process.env.EBAY_MERCHANT_LOCATION_KEY,
+  };
+}
+
+// Reuses an existing offer (PUT) if this part already has one from a prior attempt, rather than
+// always creating a new one - otherwise every retry after a fixable error (e.g. a missing photo)
+// leaves an orphaned duplicate unpublished offer sitting on the seller's account.
+async function ensureOffer(token, part, sku) {
+  const existingOfferId = part.ebay_offer_id;
+
+  const res = await fetch(
+    existingOfferId
+      ? `${BASE_URL}/sell/inventory/v1/offer/${existingOfferId}`
+      : `${BASE_URL}/sell/inventory/v1/offer`,
+    {
+      method: existingOfferId ? 'PUT' : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'Content-Language': 'en-US',
+      },
+      body: JSON.stringify(offerBody(part, sku)),
+    }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`eBay offer ${existingOfferId ? 'update' : 'creation'} failed (${res.status}): ${errText}`);
+  }
+
+  if (existingOfferId) return existingOfferId;
+  const data = await res.json();
+  return data.offerId;
+}
+
+async function publishOfferById(token, offerId) {
   const res = await fetch(`${BASE_URL}/sell/inventory/v1/offer/${offerId}/publish`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -139,4 +163,25 @@ async function publishOffer(offerId) {
   return res.json();
 }
 
-module.exports = { pushDraftListing, publishOffer };
+// One action: create/update the inventory item, create/update its offer (reusing an existing
+// one if this part was already pushed before), then publish. If the item+offer succeed but
+// publish itself fails, the error carries the sku/offerId so the caller can persist them -
+// the next retry then reuses that offer instead of minting another orphaned one.
+async function publishListing(part) {
+  const token = await getAccessToken();
+  const sku = part.ebay_sku || `IND-${part.id}-${Date.now()}`;
+
+  await putInventoryItem(token, part, sku);
+  const offerId = await ensureOffer(token, part, sku);
+
+  try {
+    const result = await publishOfferById(token, offerId);
+    return { sku, offerId, listingId: result.listingId };
+  } catch (err) {
+    err.sku = sku;
+    err.offerId = offerId;
+    throw err;
+  }
+}
+
+module.exports = { publishListing };

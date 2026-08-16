@@ -1,18 +1,22 @@
 # Industrial Parts Listing Assistant
 
-A small full-stack app: upload a photo/notes about a part → Gemini identifies it and drafts a
-title, description, pricing, and item specifics → you review and edit in a dashboard → one click
-pushes it to eBay as an **unpublished draft offer**. Nothing goes live on eBay until you take a
-separate, explicit publish action.
+A small full-stack app: upload one or more photos/notes about a part (drag & drop supported) →
+Claude identifies it and drafts a title, description, pricing, condition, and item specifics →
+you review and edit everything in a dashboard → one explicit, confirmed click publishes it live
+to eBay.
 
 ## Stack
 - Backend: Node.js + Express
-- DB: SQLite (via `better-sqlite3`), file-based, no separate DB server needed
+- DB: SQLite (via Node's built-in `node:sqlite`), file-based, no separate DB server needed
 - Frontend: plain HTML/CSS/JS dashboard (no build step)
-- AI: Google Gemini API (vision + text, free tier)
+- AI: Anthropic Claude API (Claude Opus 5, vision + text, structured JSON output)
 - Marketplace: eBay Inventory API
 
 ## 1. Install
+
+Requires **Node.js 22+** (uses the built-in `node:sqlite` module, which is experimental in Node 22
+and stable from Node 24 — the `npm start`/`npm run dev` scripts already pass the
+`--experimental-sqlite` flag for you).
 
 ```bash
 npm install
@@ -28,7 +32,7 @@ cp .env.example .env
 
 You'll need:
 
-- **`GEMINI_API_KEY`** — a free key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- **`ANTHROPIC_API_KEY`** — from your [Anthropic Console](https://console.anthropic.com/settings/keys)
 - **eBay credentials** — from your eBay Developer account:
   - `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` — your app's keys
   - `EBAY_REFRESH_TOKEN` — generated once via eBay's OAuth user-consent flow (this authorizes
@@ -40,6 +44,11 @@ You'll need:
     policy IDs from your eBay account (Seller Hub → Business Policies)
   - `EBAY_CATEGORY_ID` — the eBay category ID your parts should list under (verify the exact
     ID for your specific product type at eBay's category lookup)
+- **`PUBLIC_BASE_URL`** — eBay's Inventory API fetches listing photos itself from a public HTTPS
+  URL; it can never reach `localhost`. For local development, run `ngrok http 3000` in a separate
+  terminal and paste the `https://...ngrok-free.app` URL it prints here (it changes each time you
+  restart ngrok on the free tier — update `.env` and restart the server when it does). For a real
+  deployment, use your app's actual public domain instead.
 
 Start with `EBAY_ENV=sandbox` and eBay's sandbox credentials until you've tested the flow
 end-to-end — this avoids any risk of pushing test data into your live store.
@@ -52,24 +61,35 @@ npm start
 
 Visit `http://localhost:3000`.
 
-## How the review/draft safety works
+## How the review → publish flow works
 
-1. **Generate** — uploading a photo/notes only calls Claude and saves a row in your local
+1. **Generate** — uploading photo(s)/notes only calls Claude and saves a row in your local
    SQLite DB. Nothing touches eBay at this point.
-2. **Review/edit** — you can edit the title, description, price, and specifics directly in the
-   dashboard before anything is sent anywhere.
-3. **Push to eBay** — this calls eBay's Inventory API to create the item and an **offer**, but
-   deliberately never calls `publishOffer`. The listing exists in your Seller Hub as a draft,
-   invisible to buyers.
-4. **Publish** — a separate route (`POST /api/parts/:id/publish`) exists in `routes/parts.js`
-   but is intentionally **not wired to a button** in the dashboard yet. That's on purpose — add
-   the button yourself once you're comfortable, or just publish drafts manually from Seller Hub.
+2. **Review/edit** — you can edit the title, description, price, condition, photos, and specifics
+   directly in the dashboard before anything is sent anywhere. Add or remove photos at any point
+   before publishing.
+3. **Publish** — one button, gated behind a confirmation dialog that says publishing makes the
+   listing live and visible to real buyers immediately. Under the hood this creates/updates the
+   eBay inventory item, creates/updates its offer, and publishes it, all in one request.
+
+Earlier versions of this app had a separate "push to eBay as an unpublished draft" step before
+publishing. That was removed: eBay's own Seller Hub UI doesn't surface unpublished Inventory-API
+offers anywhere useful (they don't show up under Seller Hub → Listings → Drafts, which is a
+different, older mechanism), so the intermediate step added an eBay-side API call without a
+matching way to actually review it there. The real review step is this dashboard, before you
+click Publish.
+
+**Retries are safe.** If a publish attempt fails after the item/offer were created (e.g. eBay
+rejects the listing for a fixable reason), the app remembers that item's SKU and offer ID and
+reuses them on your next attempt instead of creating a duplicate. Fix the issue and click Publish
+again.
 
 ## Known things to double check before relying on this for real inventory
 
-- **Condition mapping**: the eBay push currently hardcodes `condition: 'USED_EXCELLENT'`. Your
-  parts likely span multiple real conditions (used, refurbished, new-surplus, for-parts). You'll
-  want to add a condition field to the dashboard and pass it through instead of hardcoding it.
+- **Condition**: Claude proposes a condition (New, New-Other, Used Excellent/Very Good/Good/
+  Acceptable, or For Parts/Not Working) based on the photo and notes, editable in the dashboard
+  before pushing. Still worth double-checking — condition assessment from a photo alone has real
+  limits, and it directly affects buyer expectations and return risk.
 - **Category ID**: `EBAY_CATEGORY_ID` in `.env` needs to match the real eBay category for each
   part type — relays and PLC modules may live in different categories. You may want to let
   Claude suggest a category per item, or maintain a small lookup table.
@@ -79,8 +99,10 @@ Visit `http://localhost:3000`.
 - **Pricing**: Claude's price suggestions are rough estimates based on general knowledge, not
   live comps. Worth spot-checking against actual sold listings before publishing, especially
   for less common parts.
-- **Photos**: only single-photo upload is wired up. eBay listings support multiple images —
-  worth extending `multer` to accept an array of files if that matters to you.
+- **Photos require `PUBLIC_BASE_URL` to be set and reachable** — if you're using ngrok and it's
+  not currently running (or the free-tier URL rotated since you last set it), publishing will
+  fail with a clear error rather than a cryptic eBay one, but it'll still fail. Up to 12 photos
+  per listing (eBay's limit).
 
 ## Project structure
 
@@ -88,10 +110,10 @@ Visit `http://localhost:3000`.
 ebay-app/
 ├── server.js              # Express app entry point
 ├── db.js                  # SQLite schema/setup
-├── routes/parts.js        # API routes: upload, list, edit, push-to-ebay, publish
+├── routes/parts.js        # API routes: upload, list, edit, photos add/remove, publish
 ├── services/
-│   ├── geminiService.js   # Calls Gemini API to identify part + draft listing
-│   └── ebayService.js     # Calls eBay Inventory API (draft-only)
+│   ├── claudeService.js   # Calls Claude API to identify part + draft listing
+│   └── ebayService.js     # Calls eBay Inventory API (create/update item+offer, publish)
 ├── public/                # Dashboard (HTML/CSS/JS, no build step)
 ├── uploads/                # Uploaded part photos
 └── data/app.db             # SQLite database (created on first run)

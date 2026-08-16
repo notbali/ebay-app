@@ -9,7 +9,7 @@
 <body>
   <header>
     <h1>Listing Assistant</h1>
-    <p>Upload a part → Gemini drafts the listing → you review → push to eBay as a draft.</p>
+    <p>Upload a part → Claude drafts the listing → you review → publish live to eBay.</p>
   </header>
 
   <main>
@@ -17,8 +17,12 @@
       <h2>New Part</h2>
       <form id="upload-form">
         <label>
-          Photo
-          <input type="file" id="photo-input" name="photo" accept="image/*" />
+          Photos (up to 12)
+          <div id="photo-dropzone" class="dropzone">
+            <p>Drag &amp; drop photos here, or click to browse</p>
+            <input type="file" id="photo-input" name="photos" accept="image/*" multiple hidden />
+          </div>
+          <div id="photo-preview" class="photo-preview"></div>
         </label>
         <label>
           Notes / part number / spec sheet text (optional but helps accuracy)
