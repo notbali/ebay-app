@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-const path = require('path');
+const { uploadPartPhoto } = require('./r2Service');
 
 const BASE_URL = process.env.EBAY_ENV === 'sandbox'
   ? 'https://api.sandbox.ebay.com'
@@ -119,20 +119,11 @@ async function suggestCategories(query) {
   }));
 }
 
-// eBay fetches listing images itself from a public HTTPS URL - it can never reach localhost.
-function buildImageUrls(part) {
+// eBay fetches listing images itself from a public HTTPS URL - it can never reach localhost -
+// so each photo is uploaded to R2 and eBay is given the resulting public URLs.
+async function buildImageUrls(part) {
   const photoPaths = JSON.parse(part.photo_paths_json || '[]');
-  if (photoPaths.length === 0) return [];
-
-  if (!process.env.PUBLIC_BASE_URL) {
-    throw new Error(
-      'PUBLIC_BASE_URL is not set in .env - eBay needs a public https URL to fetch photos from. ' +
-      'Run `ngrok http 3000` and paste the https URL it prints into PUBLIC_BASE_URL, then restart the server.'
-    );
-  }
-
-  const base = process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
-  return photoPaths.map((p) => `${base}/uploads/${path.basename(p)}`);
+  return Promise.all(photoPaths.map(uploadPartPhoto));
 }
 
 async function putInventoryItem(token, part, sku) {
@@ -161,7 +152,7 @@ async function putInventoryItem(token, part, sku) {
         aspects,
         brand: part.ai_brand || undefined,
         mpn: part.ai_part_number || undefined,
-        imageUrls: buildImageUrls(part),
+        imageUrls: await buildImageUrls(part),
       },
     }),
   });

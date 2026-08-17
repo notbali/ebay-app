@@ -11,6 +11,7 @@ to eBay.
 - Frontend: plain HTML/CSS/JS dashboard (no build step)
 - AI: Anthropic Claude API (Claude Opus 5, vision + text, structured JSON output)
 - Marketplace: eBay Inventory API
+- Photo hosting: Cloudflare R2 (eBay needs a public HTTPS URL to fetch each photo from)
 
 ## 1. Install
 
@@ -44,37 +45,26 @@ You'll need:
     policy IDs from your eBay account (Seller Hub → Business Policies)
   - `EBAY_CATEGORY_ID` — the eBay category ID your parts should list under (verify the exact
     ID for your specific product type at eBay's category lookup)
-- **`PUBLIC_BASE_URL`** — eBay's Inventory API fetches listing photos itself from a public HTTPS
-  URL; it can never reach `localhost`. For local development, run `ngrok http 3000` in a separate
-  terminal and paste the `https://...ngrok-free.app` URL it prints here (it changes each time you
-  restart ngrok on the free tier — update `.env` and restart the server when it does). For a real
-  deployment, use your app's actual public domain instead.
+- **Cloudflare R2 credentials** — eBay's Inventory API fetches listing photos itself from a
+  public HTTPS URL; it can never reach `localhost`, so each photo is uploaded to R2 right before
+  publishing:
+  - Create a bucket in the Cloudflare dashboard (dash.cloudflare.com) → R2, and enable public
+    access on it (either the free `r2.dev` subdomain, or your own custom domain)
+  - Create an R2 API token (R2 → Manage API Tokens) scoped to that bucket for
+    `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
+  - `R2_ACCOUNT_ID` is shown on your Cloudflare dashboard's R2 overview page
+  - `R2_PUBLIC_BASE_URL` is the public URL the bucket is served from, no trailing slash
 
 Start with `EBAY_ENV=sandbox` and eBay's sandbox credentials until you've tested the flow
 end-to-end — this avoids any risk of pushing test data into your live store.
 
 ## 3. Run
 
-**Option A — app + ngrok tunnel together (recommended for local dev):**
-
-```bash
-npm run start:tunnel
-```
-
-Starts ngrok, waits for it to connect, writes the tunnel's public URL into `.env` as
-`PUBLIC_BASE_URL` automatically, then starts the app — so photos work without any manual
-copy-pasting. Requires ngrok to be installed and authenticated (`ngrok config add-authtoken ...`)
-first; see the `PUBLIC_BASE_URL` section above. If `ngrok` isn't on your PATH, set `NGROK_PATH` in
-`.env` to its full executable path.
-
-**Option B — just the app** (if you're managing the tunnel yourself, or deploying somewhere with
-a real public URL and don't need one):
-
 ```bash
 npm start
 ```
 
-Either way, visit `http://localhost:3000`.
+Visit `http://localhost:3000`.
 
 ## How the review → publish flow works
 
@@ -117,10 +107,9 @@ again.
 - **Pricing**: Claude's price suggestions are rough estimates based on general knowledge, not
   live comps. Worth spot-checking against actual sold listings before publishing, especially
   for less common parts.
-- **Photos require `PUBLIC_BASE_URL` to be set and reachable** — if you're using ngrok and it's
-  not currently running (or the free-tier URL rotated since you last set it), publishing will
-  fail with a clear error rather than a cryptic eBay one, but it'll still fail. Up to 12 photos
-  per listing (eBay's limit).
+- **Photos require the R2 env vars to be filled in** — each photo is uploaded to your R2 bucket
+  right before eBay is called, so publishing will fail if those credentials are missing or wrong.
+  Up to 12 photos per listing (eBay's limit).
 
 ## Project structure
 
@@ -131,7 +120,8 @@ ebay-app/
 ├── routes/parts.js        # API routes: upload, list, edit, photos add/remove, publish
 ├── services/
 │   ├── claudeService.js   # Calls Claude API to identify part + draft listing
-│   └── ebayService.js     # Calls eBay Inventory API (create/update item+offer, publish)
+│   ├── ebayService.js     # Calls eBay Inventory API (create/update item+offer, publish)
+│   └── r2Service.js       # Uploads photos to Cloudflare R2 for eBay's imageUrls
 ├── public/                # Dashboard (HTML/CSS/JS, no build step)
 ├── uploads/                # Uploaded part photos
 └── data/app.db             # SQLite database (created on first run)
