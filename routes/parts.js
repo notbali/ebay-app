@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const { generateListing } = require('../services/claudeService');
-const { publishListing } = require('../services/ebayService');
+const { publishListing, suggestCategories } = require('../services/ebayService');
 
 const router = express.Router();
 
@@ -26,11 +26,22 @@ router.post('/', upload.array('photos', 12), async (req, res) => {
 
     const ai = await generateListing({ imagePaths, rawInput });
 
+    // Best-effort: if the category lookup itself fails (eBay API hiccup, no match, etc.), still
+    // save the draft - the seller can search for the right category manually in the dashboard.
+    let category = null;
+    try {
+      const suggestions = await suggestCategories(ai.category_search_term);
+      category = suggestions[0] || null;
+    } catch (e) {
+      console.error('Category suggestion failed:', e.message);
+    }
+
     const stmt = db.prepare(`
       INSERT INTO parts (
         photo_paths_json, raw_input, ai_part_number, ai_brand, ai_title, ai_description,
-        ai_price_low, ai_price_high, ai_specifics_json, ai_confidence, ai_condition, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
+        ai_price_low, ai_price_high, ai_specifics_json, ai_confidence, ai_condition,
+        ai_category_id, ai_category_name, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
     `);
 
     const info = stmt.run(
@@ -44,7 +55,9 @@ router.post('/', upload.array('photos', 12), async (req, res) => {
       ai.price_high,
       JSON.stringify(ai.specifics || {}),
       ai.confidence,
-      ai.condition
+      ai.condition,
+      category ? category.categoryId : null,
+      category ? category.categoryName : null
     );
 
     const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(info.lastInsertRowid);
@@ -70,7 +83,10 @@ router.get('/:id', (req, res) => {
 
 // --- Edit a draft before publishing (seller review step) ---
 router.put('/:id', (req, res) => {
-  const fields = ['ai_title', 'ai_description', 'ai_price_low', 'ai_price_high', 'ai_specifics_json', 'ai_condition'];
+  const fields = [
+    'ai_title', 'ai_description', 'ai_price_low', 'ai_price_high', 'ai_specifics_json',
+    'ai_condition', 'ai_category_id', 'ai_category_name',
+  ];
   const updates = [];
   const values = [];
 
@@ -88,6 +104,20 @@ router.put('/:id', (req, res) => {
   db.prepare(`UPDATE parts SET ${updates.join(', ')} WHERE id = ?`).run(...values);
   const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
   res.json(part);
+});
+
+// --- Search eBay categories, for overriding the auto-suggested one in the dashboard ---
+router.get('/categories/suggest', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: 'Missing query parameter "q"' });
+
+  try {
+    const suggestions = await suggestCategories(q);
+    res.json(suggestions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- Add more photos to an existing draft ---

@@ -42,6 +42,83 @@ async function getAccessToken() {
   return data.access_token;
 }
 
+// App-level token (client credentials, no user login) for public marketplace metadata like the
+// category tree - separate from getAccessToken(), which is the user token for selling actions.
+async function getAppAccessToken() {
+  const basicAuth = Buffer.from(
+    `${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`
+  ).toString('base64');
+
+  const params = new URLSearchParams();
+  params.append('grant_type', 'client_credentials');
+  params.append('scope', 'https://api.ebay.com/oauth/api_scope');
+
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${basicAuth}`,
+    },
+    body: params,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`eBay app token request failed (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  return data.access_token;
+}
+
+let cachedCategoryTreeId = null;
+async function getCategoryTreeId(token) {
+  if (cachedCategoryTreeId) return cachedCategoryTreeId;
+
+  const marketplaceId = process.env.EBAY_MARKETPLACE_ID || 'EBAY_US';
+  const res = await fetch(
+    `${BASE_URL}/commerce/taxonomy/v1/get_default_category_tree_id?marketplace_id=${marketplaceId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`eBay category tree lookup failed (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  cachedCategoryTreeId = data.categoryTreeId;
+  return cachedCategoryTreeId;
+}
+
+// Looks up real eBay leaf categories matching a plain-language query, e.g. "general purpose
+// relay" -> [{categoryId: "36328", categoryName: "General Purpose Relays", breadcrumb: "..."}].
+// Only leaf categories are ever returned by this eBay endpoint, so no separate leaf check needed.
+async function suggestCategories(query) {
+  const token = await getAppAccessToken();
+  const treeId = await getCategoryTreeId(token);
+
+  const res = await fetch(
+    `${BASE_URL}/commerce/taxonomy/v1/category_tree/${treeId}/get_category_suggestions?q=${encodeURIComponent(query)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`eBay category suggestion failed (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  return (data.categorySuggestions || []).map((s) => ({
+    categoryId: s.category.categoryId,
+    categoryName: s.category.categoryName,
+    breadcrumb: [...(s.categoryTreeNodeAncestors || [])].reverse()
+      .map((a) => a.categoryName)
+      .concat(s.category.categoryName)
+      .join(' > '),
+  }));
+}
+
 // eBay fetches listing images itself from a public HTTPS URL - it can never reach localhost.
 function buildImageUrls(part) {
   const photoPaths = JSON.parse(part.photo_paths_json || '[]');
@@ -101,7 +178,7 @@ function offerBody(part, sku) {
     marketplaceId: process.env.EBAY_MARKETPLACE_ID || 'EBAY_US',
     format: 'FIXED_PRICE',
     availableQuantity: 1,
-    categoryId: process.env.EBAY_CATEGORY_ID,
+    categoryId: part.ai_category_id || process.env.EBAY_CATEGORY_ID,
     listingDescription: part.ai_description,
     pricingSummary: {
       price: {
@@ -184,4 +261,4 @@ async function publishListing(part) {
   }
 }
 
-module.exports = { publishListing };
+module.exports = { publishListing, suggestCategories };

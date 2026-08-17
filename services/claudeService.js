@@ -24,7 +24,11 @@ Given one or more photos and/or free-text notes about a part, do your best to:
 6. Determine the item's condition from what's visible in the photo and stated in the notes. Don't
    default to "used" just because this store mostly sells surplus parts - some items are new or
    new-old-stock. If nothing indicates otherwise, "used, good condition" is the safest default.
-7. Rate your own confidence as "high", "medium", or "low" based on how certain the identification is.
+7. Write a short category search phrase (2-6 words) describing what kind of part this is, for
+   looking up the matching eBay category - e.g. "general purpose relay", "hydraulic spin-on
+   filter", "PLC input output module", "motor starter". Describe the product type only, not the
+   brand or part number.
+8. Rate your own confidence as "high", "medium", or "low" based on how certain the identification is.
    If you can't clearly read a part number or model, say so and rate confidence "low" rather than
    inventing details.`;
 
@@ -67,6 +71,12 @@ const RESPONSE_FORMAT = {
           'shelf). USED_EXCELLENT/VERY_GOOD/GOOD/ACCEPTABLE = used, in decreasing order of ' +
           'cosmetic/functional condition. FOR_PARTS_OR_NOT_WORKING = not confirmed functional.',
       },
+      category_search_term: {
+        type: 'string',
+        description: 'Short phrase (2-6 words) describing the product type, for eBay category ' +
+          'lookup - e.g. "general purpose relay", "hydraulic spin-on filter". Product type only, ' +
+          'no brand or part number.',
+      },
       confidence: {
         type: 'string',
         enum: ['high', 'medium', 'low'],
@@ -75,8 +85,8 @@ const RESPONSE_FORMAT = {
       notes_for_seller: { type: 'string', description: 'Anything the seller should double-check before publishing.' },
     },
     required: [
-      'part_number', 'brand', 'title', 'description',
-      'price_low', 'price_high', 'specifics', 'condition', 'confidence', 'notes_for_seller',
+      'part_number', 'brand', 'title', 'description', 'price_low', 'price_high', 'specifics',
+      'condition', 'category_search_term', 'confidence', 'notes_for_seller',
     ],
     additionalProperties: false,
   },

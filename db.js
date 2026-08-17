@@ -21,6 +21,8 @@ db.exec(`
     ai_specifics_json TEXT,      -- JSON blob of item specifics (voltage, amperage, etc.)
     ai_confidence TEXT,          -- 'high' | 'medium' | 'low' - how sure Claude was on ID
     ai_condition TEXT DEFAULT 'USED_GOOD', -- eBay condition enum value, seller-reviewable
+    ai_category_id TEXT,         -- eBay leaf category ID, looked up per-item via Taxonomy API
+    ai_category_name TEXT,       -- human-readable name shown in the dashboard
     status TEXT DEFAULT 'draft', -- draft -> reviewed -> pushed_to_ebay -> published
     ebay_offer_id TEXT,
     ebay_sku TEXT,
@@ -48,6 +50,10 @@ if (!columns.includes('photo_paths_json')) {
 }
 if (!columns.includes('ebay_listing_id')) {
   db.exec('ALTER TABLE parts ADD COLUMN ebay_listing_id TEXT');
+}
+if (!columns.includes('ai_category_id')) {
+  db.exec('ALTER TABLE parts ADD COLUMN ai_category_id TEXT');
+  db.exec('ALTER TABLE parts ADD COLUMN ai_category_name TEXT');
 }
 
 module.exports = db;

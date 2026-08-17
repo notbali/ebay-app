@@ -55,11 +55,26 @@ end-to-end — this avoids any risk of pushing test data into your live store.
 
 ## 3. Run
 
+**Option A — app + ngrok tunnel together (recommended for local dev):**
+
+```bash
+npm run start:tunnel
+```
+
+Starts ngrok, waits for it to connect, writes the tunnel's public URL into `.env` as
+`PUBLIC_BASE_URL` automatically, then starts the app — so photos work without any manual
+copy-pasting. Requires ngrok to be installed and authenticated (`ngrok config add-authtoken ...`)
+first; see the `PUBLIC_BASE_URL` section above. If `ngrok` isn't on your PATH, set `NGROK_PATH` in
+`.env` to its full executable path.
+
+**Option B — just the app** (if you're managing the tunnel yourself, or deploying somewhere with
+a real public URL and don't need one):
+
 ```bash
 npm start
 ```
 
-Visit `http://localhost:3000`.
+Either way, visit `http://localhost:3000`.
 
 ## How the review → publish flow works
 
@@ -90,9 +105,12 @@ again.
   Acceptable, or For Parts/Not Working) based on the photo and notes, editable in the dashboard
   before pushing. Still worth double-checking — condition assessment from a photo alone has real
   limits, and it directly affects buyer expectations and return risk.
-- **Category ID**: `EBAY_CATEGORY_ID` in `.env` needs to match the real eBay category for each
-  part type — relays and PLC modules may live in different categories. You may want to let
-  Claude suggest a category per item, or maintain a small lookup table.
+- **Category**: Claude proposes a product-type search phrase per item (e.g. "hydraulic spin-on
+  filter"), which the app looks up against eBay's real category tree via the Taxonomy API and
+  stores the matching leaf category — shown and searchable/overridable in the dashboard. The
+  automatic top match isn't always the most specific one (e.g. it may pick a generic "Filters"
+  category over "Hydraulic Filters"), so it's worth checking before publishing. `EBAY_CATEGORY_ID`
+  in `.env` is now only a fallback for drafts where the lookup didn't run or found nothing.
 - **Access tokens**: the eBay service fetches a fresh access token on every request for
   simplicity. This works fine at low volume; if you start batch-pushing many items at once,
   you may want to cache the token for its ~2 hour lifetime.

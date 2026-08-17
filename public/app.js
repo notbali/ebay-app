@@ -134,6 +134,16 @@ function renderDraftCard(part) {
           `<option value="${value}" ${part.ai_condition === value ? 'selected' : ''}>${label}</option>`
         ).join('')}
       </select>
+      <div class="category-field">
+        <div class="category-current ${!part.ai_category_id ? 'category-missing' : ''}">
+          Category: ${part.ai_category_name ? escapeAttr(part.ai_category_name) : 'not set - search below'}
+        </div>
+        <div class="category-search">
+          <input type="text" class="category-search-input" placeholder="Search eBay categories (e.g. &quot;hydraulic filter&quot;)" />
+          <button type="button" class="secondary category-search-btn">Search</button>
+        </div>
+        <div class="category-results"></div>
+      </div>
       <textarea data-field="ai_specifics_json" rows="2" placeholder="Specifics (key: value per line)">${specificsText}</textarea>
       ${part.error_message ? `<span class="error">${escapeAttr(part.error_message)}</span>` : ''}
       <div class="actions">
@@ -159,7 +169,64 @@ function renderDraftCard(part) {
   const addInput = addZone.querySelector('input');
   setupDropzone(addZone, addInput, (files) => addPhotos(part.id, files));
 
+  setupCategorySearch(card, part.id);
+
   return card;
+}
+
+function setupCategorySearch(card, partId) {
+  const input = card.querySelector('.category-search-input');
+  const button = card.querySelector('.category-search-btn');
+  const resultsEl = card.querySelector('.category-results');
+
+  async function runSearch() {
+    const q = input.value.trim();
+    if (!q) return;
+    resultsEl.innerHTML = '<p class="muted">Searching...</p>';
+
+    const res = await fetch(`/api/parts/categories/suggest?q=${encodeURIComponent(q)}`);
+    if (!res.ok) {
+      resultsEl.innerHTML = `<p class="error">${await describeError(res)}</p>`;
+      return;
+    }
+
+    const suggestions = await res.json();
+    if (suggestions.length === 0) {
+      resultsEl.innerHTML = '<p class="muted">No matches found.</p>';
+      return;
+    }
+
+    resultsEl.innerHTML = suggestions.map((s, i) => `
+      <button type="button" class="category-result" data-i="${i}">
+        <strong>${escapeAttr(s.categoryName)}</strong>
+        <span class="muted">${escapeAttr(s.breadcrumb)}</span>
+      </button>
+    `).join('');
+
+    resultsEl.querySelectorAll('.category-result').forEach((btn, i) => {
+      btn.addEventListener('click', () => selectCategory(partId, suggestions[i]));
+    });
+  }
+
+  button.addEventListener('click', runSearch);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      runSearch();
+    }
+  });
+}
+
+async function selectCategory(id, category) {
+  await fetch(`/api/parts/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ai_category_id: category.categoryId,
+      ai_category_name: category.categoryName,
+    }),
+  });
+  loadDrafts();
 }
 
 async function saveDraft(id, card) {

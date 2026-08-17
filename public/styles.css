@@ -114,6 +114,22 @@ button.secondary { background: transparent; color: var(--accent); border: 1px so
 .badge.medium { background: #fdf1d6; color: #96690b; }
 .badge.low { background: #fbe1e1; color: #a12727; }
 
-.actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
 #upload-status { margin-top: 0.75rem; font-size: 0.9rem; color: var(--muted); }
 .error { color: #a12727; }
+.muted { color: var(--muted); }
+
+/* --- eBay category lookup/search --- */
+.category-field { display: flex; flex-direction: column; gap: 0.4rem; }
+.category-current { font-size: 0.85rem; }
+.category-current.category-missing { color: #a12727; }
+.category-search { display: flex; gap: 0.5rem; }
+.category-search-input { flex: 1; }
+.category-results { display: flex; flex-direction: column; gap: 0.25rem; }
+.category-result {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
+  background: transparent; color: var(--ink); border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem; border-radius: 6px; width: 100%; text-align: left;
+}
+.category-result:hover { border-color: var(--accent); background: #fdf6f1; }
+.category-result .muted { font-size: 0.75rem; }
