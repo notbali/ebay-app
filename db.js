@@ -23,6 +23,10 @@ db.exec(`
     ai_condition TEXT DEFAULT 'USED_GOOD', -- eBay condition enum value, seller-reviewable
     ai_category_id TEXT,         -- eBay leaf category ID, looked up per-item via Taxonomy API
     ai_category_name TEXT,       -- human-readable name shown in the dashboard
+    ai_quantity INTEGER DEFAULT 1,
+    ai_free_shipping INTEGER DEFAULT 0, -- 0 = calculated shipping (buyer's location), 1 = free
+    ai_weight_lb REAL,           -- estimated shipped-package weight, for calculated shipping
+    ai_length_in REAL, ai_width_in REAL, ai_height_in REAL, -- estimated package dimensions
     status TEXT DEFAULT 'draft', -- draft -> reviewed -> pushed_to_ebay -> published
     ebay_offer_id TEXT,
     ebay_sku TEXT,
@@ -54,6 +58,16 @@ if (!columns.includes('ebay_listing_id')) {
 if (!columns.includes('ai_category_id')) {
   db.exec('ALTER TABLE parts ADD COLUMN ai_category_id TEXT');
   db.exec('ALTER TABLE parts ADD COLUMN ai_category_name TEXT');
+}
+if (!columns.includes('ai_quantity')) {
+  db.exec('ALTER TABLE parts ADD COLUMN ai_quantity INTEGER DEFAULT 1');
+}
+if (!columns.includes('ai_free_shipping')) {
+  db.exec('ALTER TABLE parts ADD COLUMN ai_free_shipping INTEGER DEFAULT 0');
+  db.exec('ALTER TABLE parts ADD COLUMN ai_weight_lb REAL');
+  db.exec('ALTER TABLE parts ADD COLUMN ai_length_in REAL');
+  db.exec('ALTER TABLE parts ADD COLUMN ai_width_in REAL');
+  db.exec('ALTER TABLE parts ADD COLUMN ai_height_in REAL');
 }
 
 module.exports = db;

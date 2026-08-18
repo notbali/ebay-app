@@ -1,96 +1,330 @@
+/* ============================================================
+   The Bali Bay — design tokens
+   Dark "midnight bay" palette from the provided navy/steel-blue swatch
+   (palest band intentionally dropped, so the app runs as a dark theme):
+   abyss = deepest surfaces/bg, harbor = card surfaces, tide = borders/muted,
+   current = primary interactive accent (ship/routes/buttons).
+   foam is a plain near-white for text-on-dark only - not a decorative
+   swatch color. danger is a deliberate off-palette exception (a muted
+   rust/copper, not a brand blue) reserved for destructive/error states,
+   since color-coding "something is wrong" needs a hue distinct from the
+   all-blue brand accent to stay legible as a signal.
+   ============================================================ */
 :root {
-  --ink: #1a1a1a;
-  --muted: #6b6b6b;
-  --border: #e0ded9;
-  --accent: #b0501e;
-  --bg: #faf9f6;
-  --card: #ffffff;
+  --abyss: #0F1729;
+  --harbor: #1B2A40;
+  --tide: #3E5779;
+  --current: #6E92BA;
+  --current-deep: #547A9E;
+  --foam: #EEF1F6;
+
+  --danger: #B4553B;
+  --danger-deep: #954432;
+
+  --text-heading: var(--foam);
+  --text-body: #C9D2DE;
+  --text-secondary: #90A4BE; /* lightened tide - meets WCAG AA on abyss/harbor, true tide reserved for non-text UI */
+  --text-on-dark: var(--foam);
+
+  --border: rgba(110, 146, 186, 0.28); /* current, translucent */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.5);
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+
+  --dur-fast: 150ms;
+  --dur-base: 320ms;
 }
 
 * { box-sizing: border-box; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--bg);
-  color: var(--ink);
+  font-family: var(--font-body);
+  background: var(--abyss);
+  color: var(--text-body);
   margin: 0;
   padding: 0 1.5rem 4rem;
 }
 
-header {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 2.5rem 0 1rem;
+h1, h2, h3 { font-family: var(--font-display); color: var(--text-heading); }
+
+a { color: var(--current); }
+a:hover { color: var(--foam); }
+
+/* ============================================================
+   Reveal-on-load — headings fade+lift in once, used sparingly
+   (persistent headings via IntersectionObserver, dynamic modal/overlay
+   headings triggered directly at creation time). Never reused per scroll.
+   ============================================================ */
+.reveal-on-load {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal-on-load.revealed { opacity: 1; transform: translateY(0); }
+
+/* ============================================================
+   Background water motion — a barely-perceptible drifting line pattern
+   behind all content. Fixed, non-interactive, GPU-only (transform).
+   ============================================================ */
+.water-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.05;
+  overflow: hidden;
+}
+.water-bg svg {
+  width: 220%;
+  height: 100%;
+  animation: water-drift 80s linear infinite;
+}
+@keyframes water-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-52.5%); }
 }
 
-header h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
-header p { color: var(--muted); margin: 0; }
+/* ============================================================
+   Header — "command center" bar
+   ============================================================ */
+.site-header {
+  background: var(--abyss);
+  color: var(--text-on-dark);
+  margin: 0 -1.5rem 2rem;
+  padding: 1.75rem 1.5rem;
+  border-bottom: 3px solid var(--current);
+}
+
+.site-header-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: fit-content; /* sizes to the widest child (the h1) so the wave/ship SVG below, at
+    width:100%, exactly matches the heading's rendered width instead of a fixed guessed px value */
+}
+
+.wordmark .kicker {
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  color: var(--foam);
+  opacity: 0.6;
+}
+
+.wordmark h1 {
+  margin: 0;
+  font-size: 2.1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  color: var(--text-on-dark);
+}
+
+.wordmark svg {
+  flex: 0 0 auto;
+  margin-top: 4px;
+  width: 100%;
+  height: auto;
+}
+
+/* ============================================================
+   Header brand mark — ship sails the width of the wordmark, ping-ponging
+   end to end (CSS offset-path + alternate direction), riding the wave's
+   contour as it travels. Speeds up smoothly on hover, eases back on leave.
+   ============================================================ */
+.brand-wave {
+  fill: none;
+  stroke: var(--tide);
+  stroke-width: 1.3;
+  opacity: 0.75;
+}
+.brand-ship-wake { fill: none; stroke: var(--current); stroke-width: 1.1; opacity: 0.3; }
+.brand-ship path:first-child { fill: var(--abyss); stroke: var(--current); stroke-width: 1.6; stroke-linejoin: round; }
+.brand-ship path:nth-child(2) { fill: none; stroke: var(--current); stroke-width: 1.5; }
+.brand-ship-sail-a { fill: var(--current); stroke: none; opacity: 0.92; }
+.brand-ship-sail-b { fill: var(--current); stroke: none; opacity: 0.5; }
+
+.brand-ship-travel {
+  offset-path: path("M0 22 q 12.5 -6 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0");
+  offset-rotate: 0deg;
+  offset-distance: 50%; /* resting position when the animation is off (reduced motion) */
+  animation: brand-ship-sail 9s ease-in-out infinite alternate;
+}
+/* Hover speed-up is applied via the Web Animations API (playbackRate) in app.js, not by
+   changing animation-duration here - CSS recalculates progress as elapsed-time / duration on a
+   duration change, which jumps to a different point in the cycle instead of continuing smoothly
+   from wherever the ship currently is. playbackRate scales the existing timeline in place. */
+@keyframes brand-ship-sail {
+  from { offset-distance: 3%; }
+  to { offset-distance: 97%; }
+}
+
+@supports not (offset-path: path("M0 0")) {
+  .brand-ship-travel { animation: brand-ship-bob 1.8s ease-in-out infinite; offset-distance: unset; }
+  @keyframes brand-ship-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+}
+
+.site-header p {
+  margin: 0.3rem 0 0;
+  color: var(--foam);
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
 
 main { max-width: 900px; margin: 0 auto; }
 
 section {
-  background: var(--card);
+  background: var(--harbor);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
 
-h2 { margin-top: 0; font-size: 1.1rem; }
+h2 {
+  margin: 0 0 1rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+h2 .subhead {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 0.15rem;
+}
 
+/* ============================================================
+   Forms
+   ============================================================ */
 form { display: flex; flex-direction: column; gap: 1rem; }
-label { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem; color: var(--muted); }
-input, textarea, select { font-family: inherit; font-size: 0.95rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; }
+label { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem; color: var(--text-secondary); }
+input, textarea, select {
+  font-family: inherit; font-size: 0.95rem; padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--abyss); color: var(--text-body);
+}
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--current); outline-offset: 2px;
+}
 
 button {
-  background: var(--accent);
-  color: white;
+  font-family: var(--font-body);
+  background: var(--current);
+  color: var(--abyss);
   border: none;
   padding: 0.6rem 1.2rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
   width: fit-content;
+  transition: background var(--dur-fast), transform 0.12s ease-out, box-shadow var(--dur-fast);
 }
-button:hover { opacity: 0.9; }
-button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+button:hover:not(:disabled) { background: var(--foam); box-shadow: 0 4px 14px rgba(110, 146, 186, 0.35); }
+button:active:not(:disabled) { transform: translateY(1px) !important; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
 
+button.secondary {
+  background: transparent; color: var(--foam);
+  border: 1px solid var(--tide);
+}
+button.secondary:hover:not(:disabled) { background: rgba(110, 146, 186, 0.12); box-shadow: none; }
+
+button.danger { background: var(--danger); color: #fff; }
+button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow: 0 4px 14px rgba(180, 85, 59, 0.35); }
+
+/* ============================================================
+   Draft cards — "voyage manifest" tickets
+   ============================================================ */
 .draft-card {
+  position: relative;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
+  background: var(--abyss);
   padding: 1rem;
   margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, opacity 0.4s ease;
 }
+.draft-card::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), rgba(110, 146, 186, 0.12), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.draft-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--current);
+  box-shadow: var(--shadow);
+}
+.draft-card:hover::before { opacity: 1; }
+
+.draft-card.entering { opacity: 0; transform: translateY(6px); }
 
 .draft-card .fields { display: flex; flex-direction: column; gap: 0.5rem; }
 .draft-card input, .draft-card textarea, .draft-card select { width: 100%; }
 
-/* --- Photo gallery (draft cards) & dropzones (new-part form + per-card add-photos) --- */
+.card-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* --- Photo gallery & dropzones --- */
 .photo-gallery { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.placeholder { width: 90px; height: 90px; background: #eee; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.75rem; }
+.placeholder {
+  width: 90px; height: 90px; background: var(--harbor); border: 1px dashed var(--border);
+  border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); font-size: 0.75rem; text-align: center;
+}
 
 .thumb { position: relative; width: 90px; height: 90px; flex: 0 0 auto; }
-.thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; display: block; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-sm); display: block; }
 .thumb button {
   position: absolute; top: -6px; right: -6px;
-  width: 20px; height: 20px; padding: 0;
-  border-radius: 50%; background: var(--ink); color: white;
+  width: 22px; height: 22px; padding: 0; min-width: 0;
+  border-radius: 50%; background: var(--abyss); color: var(--foam); border: 1px solid var(--border);
   font-size: 0.85rem; line-height: 1; display: flex; align-items: center; justify-content: center;
 }
 
 .dropzone {
-  border: 2px dashed var(--border);
-  border-radius: 8px;
+  border: 2px dashed var(--tide);
+  border-radius: var(--radius);
   padding: 1.5rem;
   text-align: center;
-  color: var(--muted);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
 }
-.dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: #fdf6f1; }
+.dropzone:hover, .dropzone.dragover { border-color: var(--current); background: rgba(110, 146, 186, 0.08); }
 .dropzone p { margin: 0; font-size: 0.85rem; }
 
 .dropzone-small {
@@ -101,35 +335,254 @@ button.secondary { background: transparent; color: var(--accent); border: 1px so
 
 .photo-preview { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
+/* --- Status badges: voyage stage labels --- */
 .badge {
-  display: inline-block;
-  font-size: 0.7rem;
-  padding: 0.15rem 0.5rem;
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  background: #eee;
-  color: var(--muted);
+  background: rgba(110, 146, 186, 0.14);
+  color: var(--text-secondary);
   width: fit-content;
 }
-.badge.high { background: #dff3e3; color: #1d7a3a; }
-.badge.medium { background: #fdf1d6; color: #96690b; }
-.badge.low { background: #fbe1e1; color: #a12727; }
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge.stage-inport { background: rgba(110, 146, 186, 0.14); color: var(--text-secondary); }
+.badge.stage-ready { background: rgba(110, 146, 186, 0.22); color: var(--current); }
+.badge.stage-delayed { background: rgba(180, 85, 59, 0.2); color: #e29b87; }
+.badge.stage-delivered { background: rgba(110, 146, 186, 0.28); color: var(--foam); }
 
-.actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
-#upload-status { margin-top: 0.75rem; font-size: 0.9rem; color: var(--muted); }
-.error { color: #a12727; }
-.muted { color: var(--muted); }
+.actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; flex-wrap: wrap; }
+#upload-status { margin-top: 0.75rem; font-size: 0.9rem; color: var(--text-secondary); }
+.error { color: #e29b87; }
+.muted { color: var(--text-secondary); }
+
+.shipping-field { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem; color: var(--text-secondary); }
 
 /* --- eBay category lookup/search --- */
 .category-field { display: flex; flex-direction: column; gap: 0.4rem; }
 .category-current { font-size: 0.85rem; }
-.category-current.category-missing { color: #a12727; }
+.category-current.category-missing { color: #e29b87; }
 .category-search { display: flex; gap: 0.5rem; }
 .category-search-input { flex: 1; }
 .category-results { display: flex; flex-direction: column; gap: 0.25rem; }
 .category-result {
   display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
-  background: transparent; color: var(--ink); border: 1px solid var(--border);
-  padding: 0.4rem 0.6rem; border-radius: 6px; width: 100%; text-align: left;
+  background: transparent; color: var(--text-body); border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem; border-radius: var(--radius-sm); width: 100%; text-align: left;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
 }
-.category-result:hover { border-color: var(--accent); background: #fdf6f1; }
+.category-result:hover { border-color: var(--current); background: rgba(110, 146, 186, 0.08); }
 .category-result .muted { font-size: 0.75rem; }
+
+/* ============================================================
+   Delete draft — trash icon + confirmation popover
+   ============================================================ */
+.delete-trigger {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  width: 44px; height: 44px; min-width: 44px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+.delete-trigger:hover:not(:disabled) { background: rgba(180, 85, 59, 0.14); color: #e29b87; border-color: var(--danger); }
+
+.delete-popover {
+  position: absolute; top: 3.2rem; right: 1rem; z-index: 5;
+  background: var(--harbor); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 0.9rem; width: min(280px, calc(100% - 2rem));
+  display: none; flex-direction: column; gap: 0.6rem;
+}
+.delete-popover.open { display: flex; }
+.delete-popover p { margin: 0; font-size: 0.85rem; color: var(--text-body); }
+.delete-popover .popover-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+.draft-card.removing { animation: card-collapse var(--dur-base) ease forwards; }
+@keyframes card-collapse {
+  to { opacity: 0; transform: scale(0.97); max-height: 0; margin: 0; padding: 0; border-width: 0; }
+}
+
+/* ============================================================
+   Voyage map — shared by generation + shipping loading states
+   ============================================================ */
+.voyage-map { display: block; width: 100%; height: auto; }
+.voyage-map .voyage-water { fill: var(--abyss); }
+.voyage-map .voyage-chart-line { stroke: var(--tide); opacity: 0.5; }
+
+.voyage-map .voyage-route {
+  fill: none; stroke: var(--current); stroke-width: 2.5; stroke-linecap: round;
+}
+.voyage-map .voyage-route.drawing { transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1); }
+.voyage-map .voyage-route.charted {
+  stroke-dasharray: 6 8;
+  animation: voyage-dash 1.6s linear infinite;
+}
+.voyage-map .voyage-waypoint { fill: var(--tide); }
+.voyage-map .voyage-port circle { fill: var(--current); }
+.voyage-map .voyage-port text, .voyage-map .voyage-dest text {
+  font-family: var(--font-body); font-size: 11px; font-weight: 600; fill: var(--text-heading);
+}
+.voyage-map .voyage-dest circle {
+  fill: var(--current);
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+.voyage-map .voyage-ship { fill: var(--current); stroke: var(--abyss); stroke-width: 0.6; }
+.voyage-map .voyage-ship-sail { fill: var(--foam); }
+.voyage-map .voyage-ship-wake { fill: none; stroke: var(--current); stroke-width: 1.2; opacity: 0.35; }
+
+@keyframes voyage-dash {
+  to { stroke-dashoffset: -28; }
+}
+
+@supports (offset-path: path("M0 0")) {
+  .voyage-map .voyage-ship-group {
+    offset-rotate: 0deg;
+    animation: voyage-sail 3.2s ease-in-out infinite alternate;
+  }
+  .voyage-map .voyage-ship-ghost-1 { offset-rotate: 0deg; animation: voyage-sail 3.2s ease-in-out infinite alternate; animation-delay: -0.22s; opacity: 0.28; }
+  .voyage-map .voyage-ship-ghost-2 { offset-rotate: 0deg; animation: voyage-sail 3.2s ease-in-out infinite alternate; animation-delay: -0.4s; opacity: 0.14; }
+  @keyframes voyage-sail {
+    from { offset-distance: 8%; }
+    to { offset-distance: 92%; }
+  }
+}
+@supports not (offset-path: path("M0 0")) {
+  .voyage-map .voyage-ship-group { animation: voyage-bob 1.8s ease-in-out infinite; }
+  .voyage-map .voyage-ship-ghost-1, .voyage-map .voyage-ship-ghost-2 { display: none; }
+  @keyframes voyage-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+}
+
+.voyage-stage-list { list-style: none; margin: 0.9rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.voyage-stage-list li {
+  font-size: 0.85rem; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 0.5rem;
+  transition: color 0.35s ease, transform 0.35s ease;
+}
+.voyage-stage-list li::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex: 0 0 auto;
+  transition: background 0.35s ease;
+}
+.voyage-stage-list li.active { color: var(--text-heading); font-weight: 600; transform: translateX(2px); }
+.voyage-stage-list li.active::before { background: var(--current); animation: pulse-dot 1.4s ease-in-out infinite; }
+.voyage-stage-list li.done { color: var(--current); }
+.voyage-stage-list li.done::before { background: var(--current); }
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(110, 146, 186, 0.5); }
+  50% { box-shadow: 0 0 0 4px rgba(110, 146, 186, 0); }
+}
+
+/* ============================================================
+   Generation overlay (in-panel, over #upload-section content)
+   ============================================================ */
+.upload-panel { position: relative; }
+.voyage-overlay {
+  position: absolute; inset: 0; z-index: 4;
+  background: var(--harbor);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex; flex-direction: column;
+  animation: fade-in var(--dur-base) ease;
+}
+.voyage-overlay h3 { margin: 0 0 0.75rem; font-size: 1.05rem; }
+.voyage-overlay .voyage-overlay-actions { margin-top: auto; display: flex; gap: 0.5rem; padding-top: 0.75rem; }
+.voyage-overlay.state-error { color: var(--text-body); }
+.voyage-overlay .voyage-error-msg {
+  background: rgba(180, 85, 59, 0.14); border: 1px solid var(--danger);
+  color: #e29b87; border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.88rem;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; } to { opacity: 1; }
+}
+
+/* ============================================================
+   Shipping modal (eBay publish)
+   ============================================================ */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 20;
+  background: rgba(15, 23, 41, 0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
+  animation: fade-in var(--dur-base) ease;
+}
+.modal-panel {
+  background: var(--harbor); border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  width: min(480px, 100%);
+  max-height: 90vh; overflow-y: auto;
+  padding: 1.5rem;
+}
+.modal-panel h3 { margin: 0 0 0.5rem; }
+.modal-panel .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem; }
+.modal-panel .modal-success-icon, .modal-panel .modal-error-icon {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 0.75rem; color: #fff; font-size: 1.3rem; font-weight: 700;
+}
+.modal-panel .modal-success-icon { background: var(--current); color: var(--abyss); }
+.modal-panel .modal-error-icon { background: var(--danger-deep); }
+
+/* ============================================================
+   Footer
+   ============================================================ */
+.site-footer {
+  max-width: 900px;
+  margin: 1.5rem auto 0;
+  padding: 1.25rem 0 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.site-footer a {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.site-footer a:hover { color: var(--foam); }
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 640px) {
+  body { padding: 0 1rem 3rem; }
+  .site-header { margin: 0 -1rem 1.5rem; }
+  .wordmark h1 { font-size: 1.25rem; }
+  section { padding: 1.1rem; }
+  .delete-popover { right: 0; left: 0; margin: 0 auto; }
+  .voyage-stage-list { flex-direction: row; flex-wrap: wrap; gap: 0.6rem 1rem; }
+  .draft-card:hover { transform: none; }
+}
+
+/* ============================================================
+   Reduced motion — disable/simplify all motion, keep information
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .voyage-map .voyage-route,
+  .voyage-map .voyage-route.drawing,
+  .voyage-map .voyage-ship-group,
+  .voyage-map .voyage-ship-ghost-1,
+  .voyage-map .voyage-ship-ghost-2,
+  .voyage-map .voyage-dest circle,
+  .brand-ship-travel,
+  .voyage-stage-list li.active::before,
+  .draft-card.removing,
+  .draft-card,
+  .draft-card::before,
+  .voyage-overlay,
+  .modal-backdrop,
+  .water-bg svg,
+  .reveal-on-load {
+    animation: none !important;
+    transition: none !important;
+  }
+  .draft-card.removing { display: none; }
+  .draft-card:hover { transform: none; }
+  .draft-card.entering { opacity: 1; transform: none; }
+  .reveal-on-load { opacity: 1; transform: none; }
+  .water-bg { display: none; }
+  * { transition-duration: 0.01ms !important; }
+}

@@ -3,41 +3,79 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Industrial Parts Listing Assistant</title>
+<meta name="description" content="The Bali Bay — an industrial parts listing assistant. Claude drafts your eBay listing, you review it, then it ships across the bay to eBay." />
+<title>The Bali Bay — Listing Voyage</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;900&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header>
-    <h1>Listing Assistant</h1>
-    <p>Upload a part → Claude drafts the listing → you review → publish live to eBay.</p>
+  <div class="water-bg" aria-hidden="true">
+    <svg viewBox="0 0 800 400" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <g stroke="#6E92BA" stroke-width="1" fill="none">
+        <path d="M0 60 q 25 -14 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0" />
+        <path d="M0 160 q 25 -10 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0" />
+        <path d="M0 270 q 25 -16 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0" />
+        <path d="M0 350 q 25 -8 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0" />
+      </g>
+    </svg>
+  </div>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div class="wordmark">
+        <span class="kicker">THE</span>
+        <h1 class="reveal-on-load">Bali Bay</h1>
+        <svg id="brand-mark" class="brand-mark-svg" viewBox="0 0 200 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" preserveAspectRatio="none">
+          <path id="brand-wave-path" class="brand-wave" d="M0 22 q 12.5 -6 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0" />
+          <g class="brand-ship-travel">
+            <ellipse class="brand-ship-wake" cx="-13" cy="2.6" rx="4.6" ry="1.1" />
+            <g class="brand-ship">
+              <path d="M-11 0 H11 L8 5.6 Q0 7.6 -8 5.6 Z" />
+              <path d="M0 0 V-15.5" />
+              <path class="brand-ship-sail-a" d="M1.8 -14.4 Q9.6 -7.6 1.8 -2.2 Z" />
+              <path class="brand-ship-sail-b" d="M-1.8 -12.6 L-7.6 -2.2 H-1.8 Z" />
+            </g>
+          </g>
+        </svg>
+      </div>
+      <p>Upload a part, Claude charts the listing, you review it, then it sails to eBay.</p>
+    </div>
   </header>
 
   <main>
     <section id="upload-section">
-      <h2>New Part</h2>
-      <form id="upload-form">
-        <label>
-          Photos (up to 12)
-          <div id="photo-dropzone" class="dropzone">
-            <p>Drag &amp; drop photos here, or click to browse</p>
-            <input type="file" id="photo-input" name="photos" accept="image/*" multiple hidden />
-          </div>
-          <div id="photo-preview" class="photo-preview"></div>
-        </label>
-        <label>
-          Notes / part number / spec sheet text (optional but helps accuracy)
-          <textarea id="notes-input" name="notes" rows="4" placeholder="e.g. Omron relay, pulled from line 3, model illegible on label but 24VDC coil, 8-pin"></textarea>
-        </label>
-        <button type="submit">Generate Listing</button>
-      </form>
-      <div id="upload-status"></div>
+      <h2 class="reveal-on-load">Prepare Cargo<span class="subhead">Photos and notes in, a drafted listing out</span></h2>
+      <div class="upload-panel" id="upload-panel">
+        <form id="upload-form">
+          <label>
+            Photos (up to 12)
+            <div id="photo-dropzone" class="dropzone">
+              <p>Drag &amp; drop photos here, or click to browse</p>
+              <input type="file" id="photo-input" name="photos" accept="image/*" multiple hidden />
+            </div>
+            <div id="photo-preview" class="photo-preview"></div>
+          </label>
+          <label>
+            Notes / part number / spec sheet text (optional but helps accuracy)
+            <textarea id="notes-input" name="notes" rows="4" placeholder="e.g. Omron relay, pulled from line 3, model illegible on label but 24VDC coil, 8-pin"></textarea>
+          </label>
+          <button type="submit">Chart the Voyage</button>
+        </form>
+        <div id="upload-status" aria-live="polite"></div>
+      </div>
     </section>
 
     <section id="drafts-section">
-      <h2>Drafts</h2>
+      <h2 class="reveal-on-load">Voyage Manifest<span class="subhead">Every listing, from port to delivered</span></h2>
       <div id="drafts-list"></div>
     </section>
   </main>
+
+  <footer class="site-footer">
+    <a href="#">Terms of Service</a>
+  </footer>
 
   <script src="app.js"></script>
 </body>

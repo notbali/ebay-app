@@ -35,7 +35,8 @@ async function uploadPartPhoto(localPath) {
     ContentType: contentType,
   }));
 
-  return `${process.env.R2_PUBLIC_BASE_URL}/${key}`;
+  const base = process.env.R2_PUBLIC_BASE_URL.replace(/\/+$/, '');
+  return `${base}/${key}`;
 }
 
 module.exports = { uploadPartPhoto };

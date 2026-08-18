@@ -119,6 +119,99 @@ async function suggestCategories(query) {
   }));
 }
 
+// Maps this app's condition enum values (the ones offered in the dashboard dropdown) to eBay's
+// numeric condition IDs, so a chosen condition can be checked against a category's allowed set
+// before publishing. NEW/NEW_OTHER/SELLER_REFURBISHED/FOR_PARTS_OR_NOT_WORKING and USED_GOOD are
+// confirmed directly from eBay's own get_item_condition_policies/error responses; USED_VERY_GOOD
+// and USED_EXCELLENT are corroborated by eBay's public docs; USED_ACCEPTABLE (6000) follows the
+// same 1000-increment ladder as its confirmed neighbors (USED_GOOD=5000, FOR_PARTS=7000).
+const CONDITION_ID_BY_ENUM = {
+  NEW: '1000',
+  NEW_OTHER: '1500',
+  SELLER_REFURBISHED: '2500',
+  USED_EXCELLENT: '3000',
+  USED_VERY_GOOD: '4000',
+  USED_GOOD: '5000',
+  USED_ACCEPTABLE: '6000',
+  FOR_PARTS_OR_NOT_WORKING: '7000',
+};
+const ENUM_BY_CONDITION_ID = Object.fromEntries(
+  Object.entries(CONDITION_ID_BY_ENUM).map(([enumName, id]) => [id, enumName])
+);
+
+// eBay restricts which item conditions are valid per leaf category (e.g. most Business &
+// Industrial categories reject the fine-grained USED_VERY_GOOD/GOOD/ACCEPTABLE tiers and only
+// accept NEW/NEW_OTHER/SELLER_REFURBISHED/USED_EXCELLENT("Used")/FOR_PARTS_OR_NOT_WORKING).
+// This fetches the marketplace-wide policy list once (it doesn't change often) and caches it,
+// so every publish can check the chosen condition against the offer's actual category first.
+let cachedConditionPolicyByCategory = null;
+async function getConditionPolicyByCategory(token) {
+  if (cachedConditionPolicyByCategory) return cachedConditionPolicyByCategory;
+
+  const marketplaceId = process.env.EBAY_MARKETPLACE_ID || 'EBAY_US';
+  const res = await fetch(
+    `${BASE_URL}/sell/metadata/v1/marketplace/${marketplaceId}/get_item_condition_policies`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`eBay item condition policy lookup failed (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  const map = new Map();
+  for (const policy of data.itemConditionPolicies || []) {
+    map.set(policy.categoryId, policy.itemConditions || []);
+  }
+  cachedConditionPolicyByCategory = map;
+  return map;
+}
+
+// Fails fast, before any eBay write, if the seller's chosen condition isn't valid for this
+// listing's category - eBay would otherwise reject the offer at publish time with an opaque
+// numeric-ID error. Skips silently (rather than blocking) if the category or condition isn't one
+// we have data for, since that's a "can't verify" case, not a known mismatch.
+async function validateCondition(part) {
+  const categoryId = part.ai_category_id || process.env.EBAY_CATEGORY_ID;
+  const condition = part.ai_condition || 'USED_GOOD';
+  const conditionId = CONDITION_ID_BY_ENUM[condition];
+  if (!categoryId || !conditionId) return;
+
+  // Uses the app-level token (like suggestCategories/getCategoryTreeId), not the user selling
+  // token, since this is public marketplace metadata rather than a selling action.
+  const appToken = await getAppAccessToken();
+  const policyByCategory = await getConditionPolicyByCategory(appToken);
+  const allowed = policyByCategory.get(String(categoryId));
+  if (!allowed) return;
+
+  const isAllowed = allowed.some((c) => c.conditionId === conditionId);
+  if (isAllowed) return;
+
+  const validLabels = allowed.map((c) => c.conditionDescription).join(', ');
+  throw new Error(
+    `Condition "${condition}" isn't valid for category "${part.ai_category_name || categoryId}". ` +
+    `Valid conditions for this category: ${validLabels}. Change the condition in the dashboard and try again.`
+  );
+}
+
+// For the dashboard's condition dropdown: returns just the conditions eBay actually allows for
+// this category, labeled with eBay's own wording (e.g. "Used" rather than this app's internal
+// "USED_EXCELLENT" enum name) - so the seller picks from real options instead of guessing which
+// of the app's generic labels maps to what eBay allows for this particular category.
+async function getValidConditions(categoryId) {
+  if (!categoryId) return null;
+
+  const appToken = await getAppAccessToken();
+  const policyByCategory = await getConditionPolicyByCategory(appToken);
+  const allowed = policyByCategory.get(String(categoryId));
+  if (!allowed) return null;
+
+  return allowed
+    .filter((c) => ENUM_BY_CONDITION_ID[c.conditionId])
+    .map((c) => ({ value: ENUM_BY_CONDITION_ID[c.conditionId], label: c.conditionDescription }));
+}
+
 // eBay fetches listing images itself from a public HTTPS URL - it can never reach localhost -
 // so each photo is uploaded to R2 and eBay is given the resulting public URLs.
 async function buildImageUrls(part) {
@@ -143,15 +236,30 @@ async function putInventoryItem(token, part, sku) {
     },
     body: JSON.stringify({
       availability: {
-        shipToLocationAvailability: { quantity: 1 },
+        shipToLocationAvailability: { quantity: part.ai_quantity || 1 },
       },
       condition: part.ai_condition || 'USED_GOOD',
+      packageWeightAndSize: part.ai_weight_lb ? {
+        weight: { value: part.ai_weight_lb, unit: 'POUND' },
+        dimensions: (part.ai_length_in && part.ai_width_in && part.ai_height_in) ? {
+          length: part.ai_length_in,
+          width: part.ai_width_in,
+          height: part.ai_height_in,
+          unit: 'INCH',
+        } : undefined,
+        packageType: 'PACKAGE_THICK_ENVELOPE',
+      } : undefined,
       product: {
         title: part.ai_title,
         description: part.ai_description,
         aspects,
-        brand: part.ai_brand || undefined,
-        mpn: part.ai_part_number || undefined,
+        // Many eBay categories require brand+MPN as a pair - sending only one half (e.g. a
+        // legible part number but no visible manufacturer name, common on generic industrial
+        // parts) gets rejected with a "BrandMPN invalid or missing" error. eBay's own convention
+        // for this is to fill the missing half with "Unbranded"/"Does Not Apply" rather than
+        // omitting it, whenever the other half is actually known.
+        brand: part.ai_brand || (part.ai_part_number ? 'Unbranded' : undefined),
+        mpn: part.ai_part_number || (part.ai_brand ? 'Does Not Apply' : undefined),
         imageUrls: await buildImageUrls(part),
       },
     }),
@@ -168,7 +276,7 @@ function offerBody(part, sku) {
     sku,
     marketplaceId: process.env.EBAY_MARKETPLACE_ID || 'EBAY_US',
     format: 'FIXED_PRICE',
-    availableQuantity: 1,
+    availableQuantity: part.ai_quantity || 1,
     categoryId: part.ai_category_id || process.env.EBAY_CATEGORY_ID,
     listingDescription: part.ai_description,
     pricingSummary: {
@@ -181,6 +289,14 @@ function offerBody(part, sku) {
       fulfillmentPolicyId: process.env.EBAY_FULFILLMENT_POLICY_ID,
       paymentPolicyId: process.env.EBAY_PAYMENT_POLICY_ID,
       returnPolicyId: process.env.EBAY_RETURN_POLICY_ID,
+      // The referenced fulfillment policy is set up (in Seller Hub) to use calculated shipping
+      // based on the buyer's location. This override zeroes the cost for just this offer when
+      // the seller wants free shipping, without touching the policy used by every other listing.
+      ...(part.ai_free_shipping ? {
+        shippingCostOverrides: [
+          { priority: 1, shippingServiceType: 'DOMESTIC', shippingCost: { value: '0.00', currency: 'USD' } },
+        ],
+      } : {}),
     },
     merchantLocationKey: process.env.EBAY_MERCHANT_LOCATION_KEY,
   };
@@ -239,6 +355,7 @@ async function publishListing(part) {
   const token = await getAccessToken();
   const sku = part.ebay_sku || `IND-${part.id}-${Date.now()}`;
 
+  await validateCondition(part);
   await putInventoryItem(token, part, sku);
   const offerId = await ensureOffer(token, part, sku);
 
@@ -252,4 +369,4 @@ async function publishListing(part) {
   }
 }
 
-module.exports = { publishListing, suggestCategories };
+module.exports = { publishListing, suggestCategories, getValidConditions };

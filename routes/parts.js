@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const { generateListing } = require('../services/claudeService');
-const { publishListing, suggestCategories } = require('../services/ebayService');
+const { publishListing, suggestCategories, getValidConditions } = require('../services/ebayService');
 
 const router = express.Router();
 
@@ -20,11 +20,20 @@ const upload = multer({
 
 // --- Create a new draft from photo(s) and/or notes ---
 router.post('/', upload.array('photos', 12), async (req, res) => {
+  // If the client cancels (e.g. the dashboard's Cancel button aborts the fetch), stop the
+  // in-flight Claude call and skip saving a draft the seller explicitly walked away from -
+  // otherwise it would silently appear moments later despite "Voyage cancelled" being shown.
+  const abortController = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) abortController.abort();
+  });
+
   try {
     const rawInput = req.body.notes || '';
     const imagePaths = (req.files || []).map((f) => f.path);
 
-    const ai = await generateListing({ imagePaths, rawInput });
+    const ai = await generateListing({ imagePaths, rawInput, signal: abortController.signal });
+    if (abortController.signal.aborted) return;
 
     // Best-effort: if the category lookup itself fails (eBay API hiccup, no match, etc.), still
     // save the draft - the seller can search for the right category manually in the dashboard.
@@ -35,13 +44,15 @@ router.post('/', upload.array('photos', 12), async (req, res) => {
     } catch (e) {
       console.error('Category suggestion failed:', e.message);
     }
+    if (abortController.signal.aborted) return;
 
     const stmt = db.prepare(`
       INSERT INTO parts (
         photo_paths_json, raw_input, ai_part_number, ai_brand, ai_title, ai_description,
         ai_price_low, ai_price_high, ai_specifics_json, ai_confidence, ai_condition,
-        ai_category_id, ai_category_name, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
+        ai_category_id, ai_category_name, ai_weight_lb, ai_length_in, ai_width_in, ai_height_in,
+        status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
     `);
 
     const info = stmt.run(
@@ -57,12 +68,17 @@ router.post('/', upload.array('photos', 12), async (req, res) => {
       ai.confidence,
       ai.condition,
       category ? category.categoryId : null,
-      category ? category.categoryName : null
+      category ? category.categoryName : null,
+      ai.weight_lb,
+      ai.length_in,
+      ai.width_in,
+      ai.height_in
     );
 
     const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(info.lastInsertRowid);
     res.json({ part, notes_for_seller: ai.notes_for_seller });
   } catch (err) {
+    if (err.name === 'AbortError') return; // client already gone - nothing to respond to
     console.error(err);
     res.status(500).json({ error: err.message });
   }
@@ -85,7 +101,8 @@ router.get('/:id', (req, res) => {
 router.put('/:id', (req, res) => {
   const fields = [
     'ai_title', 'ai_description', 'ai_price_low', 'ai_price_high', 'ai_specifics_json',
-    'ai_condition', 'ai_category_id', 'ai_category_name',
+    'ai_condition', 'ai_category_id', 'ai_category_name', 'ai_quantity', 'ai_free_shipping',
+    'ai_weight_lb', 'ai_length_in', 'ai_width_in', 'ai_height_in',
   ];
   const updates = [];
   const values = [];
@@ -114,6 +131,18 @@ router.get('/categories/suggest', async (req, res) => {
   try {
     const suggestions = await suggestCategories(q);
     res.json(suggestions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Valid item conditions for a given eBay category, so the dashboard can show real options
+//     (e.g. "Used") instead of this app's generic labels that may not apply to that category ---
+router.get('/categories/:categoryId/conditions', async (req, res) => {
+  try {
+    const conditions = await getValidConditions(req.params.categoryId);
+    res.json(conditions || []);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -193,6 +222,19 @@ router.post('/:id/publish', async (req, res) => {
 
     res.status(500).json({ error: err.message });
   }
+});
+
+// --- Delete a draft entirely (local dashboard record only - does NOT end a live eBay listing
+//     if this draft was already published; the frontend confirmation makes that distinction) ---
+router.delete('/:id', (req, res) => {
+  const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  if (!part) return res.status(404).json({ error: 'Not found' });
+
+  const paths = JSON.parse(part.photo_paths_json || '[]');
+  for (const p of paths) fs.unlink(p, () => {}); // best-effort, same pattern as the photo-remove route
+
+  db.prepare('DELETE FROM parts WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
 });
 
 module.exports = router;

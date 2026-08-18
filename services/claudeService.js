@@ -30,7 +30,11 @@ Given one or more photos and/or free-text notes about a part, do your best to:
    brand or part number.
 8. Rate your own confidence as "high", "medium", or "low" based on how certain the identification is.
    If you can't clearly read a part number or model, say so and rate confidence "low" rather than
-   inventing details.`;
+   inventing details.
+9. Estimate the shipped package weight (lb) and box dimensions (length/width/height, inches) for
+   this part - eBay uses these to calculate the buyer's shipping cost. Base it on the part's
+   apparent physical size plus reasonable packaging (padding, small box). If you're unsure, give
+   your best reasonable estimate rather than omitting it - the seller can correct it before publishing.`;
 
 // Structured outputs enforce this shape server-side, so the response is always valid JSON -
 // no markdown-fence stripping or parse-and-retry loop needed. `specifics` is a list of
@@ -83,10 +87,15 @@ const RESPONSE_FORMAT = {
         description: 'How certain the identification is. Use "low" rather than inventing details.',
       },
       notes_for_seller: { type: 'string', description: 'Anything the seller should double-check before publishing.' },
+      weight_lb: { type: 'number', description: 'Estimated shipped package weight in pounds, including packaging.' },
+      length_in: { type: 'number', description: 'Estimated shipping box length in inches.' },
+      width_in: { type: 'number', description: 'Estimated shipping box width in inches.' },
+      height_in: { type: 'number', description: 'Estimated shipping box height in inches.' },
     },
     required: [
       'part_number', 'brand', 'title', 'description', 'price_low', 'price_high', 'specifics',
       'condition', 'category_search_term', 'confidence', 'notes_for_seller',
+      'weight_lb', 'length_in', 'width_in', 'height_in',
     ],
     additionalProperties: false,
   },
@@ -99,7 +108,7 @@ function buildImageBlock(imagePath) {
   return { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } };
 }
 
-async function generateListing({ imagePaths, rawInput }) {
+async function generateListing({ imagePaths, rawInput, signal }) {
   const content = [];
 
   for (const imagePath of imagePaths || []) {
@@ -121,8 +130,16 @@ async function generateListing({ imagePaths, rawInput }) {
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content }],
       output_config: { effort: 'medium', format: RESPONSE_FORMAT },
-    });
+    }, { signal });
   } catch (err) {
+    // The SDK throws its own APIUserAbortError for a cancelled request (not the DOM AbortError
+    // this app's other abort-handling checks against) - normalize the name so callers (the
+    // publish route's cancel handling, etc.) can check err.name === 'AbortError' consistently.
+    if (err instanceof Anthropic.APIUserAbortError) {
+      const abortErr = new Error('Generation cancelled.');
+      abortErr.name = 'AbortError';
+      throw abortErr;
+    }
     throw translateApiError(err);
   }
 
