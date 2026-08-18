@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
-const { generateListing } = require('../services/claudeService');
+const { generateListing } = require('../services/aiService');
 const { publishListing, suggestCategories, getValidConditions } = require('../services/ebayService');
 
 const router = express.Router();

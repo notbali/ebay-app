@@ -275,7 +275,7 @@ function startStageCycle(stages, onUpdate, intervalMs = 2200) {
 }
 
 // ============================================================
-// Claude generation — voyage overlay over the "Prepare Cargo" panel
+// AI generation — voyage overlay over the "Prepare Cargo" panel
 // ============================================================
 const GENERATION_STAGES = ['Charting the voyage', 'Preparing the cargo', 'Writing the listing', 'Finalizing the manifest'];
 
@@ -287,7 +287,7 @@ function showGenerationOverlay() {
   overlay.id = 'generation-overlay';
   overlay.innerHTML = `
     <h3 class="reveal-on-load">Charting the voyage&hellip;</h3>
-    ${buildVoyageMap({ originLabel: 'Your Store', destLabel: "Claude's Desk" })}
+    ${buildVoyageMap({ originLabel: 'Your Store', destLabel: "The AI's Desk" })}
     ${buildStageList(GENERATION_STAGES)}
     <div class="voyage-overlay-actions">
       <button type="button" class="secondary" data-action="cancel-generation">Cancel</button>

@@ -1,7 +1,7 @@
 # Industrial Parts Listing Assistant
 
 A small full-stack app: upload one or more photos/notes about a part (drag & drop supported) →
-Claude identifies it and drafts a title, description, pricing, condition, and item specifics →
+AI identifies it and drafts a title, description, pricing, condition, and item specifics →
 you review and edit everything in a dashboard → one explicit, confirmed click publishes it live
 to eBay.
 
@@ -9,7 +9,8 @@ to eBay.
 - Backend: Node.js + Express
 - DB: SQLite (via Node's built-in `node:sqlite`), file-based, no separate DB server needed
 - Frontend: plain HTML/CSS/JS dashboard (no build step)
-- AI: Anthropic Claude API (Claude Opus 5, vision + text, structured JSON output)
+- AI: pluggable via `AI_PROVIDER` (`services/aiService.js`) - defaults to Kimi K2.6 via NVIDIA's
+  free NIM tier (vision + text, structured JSON output), or Anthropic Claude as a fallback
 - Marketplace: eBay Inventory API
 - Photo hosting: Cloudflare R2 (eBay needs a public HTTPS URL to fetch each photo from)
 
@@ -33,7 +34,12 @@ cp .env.example .env
 
 You'll need:
 
-- **`ANTHROPIC_API_KEY`** — from your [Anthropic Console](https://console.anthropic.com/settings/keys)
+- **AI provider** — set `AI_PROVIDER` to `kimi` (default) or `claude`:
+  - `kimi` uses Moonshot AI's Kimi K2.6 via NVIDIA's free NIM tier — sign up free at
+    [build.nvidia.com](https://build.nvidia.com), then Account → API Keys, for `NVIDIA_API_KEY`.
+    Free tier is rate-limited to roughly 40 requests/minute.
+  - `claude` uses Anthropic's API — get `ANTHROPIC_API_KEY` from your
+    [Anthropic Console](https://console.anthropic.com/settings/keys). Paid only, no free tier.
 - **eBay credentials** — from your eBay Developer account:
   - `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` — your app's keys
   - `EBAY_REFRESH_TOKEN` — generated once via eBay's OAuth user-consent flow (this authorizes
@@ -68,7 +74,7 @@ Visit `http://localhost:3000`.
 
 ## How the review → publish flow works
 
-1. **Generate** — uploading photo(s)/notes only calls Claude and saves a row in your local
+1. **Generate** — uploading photo(s)/notes only calls the AI provider and saves a row in your local
    SQLite DB. Nothing touches eBay at this point.
 2. **Review/edit** — you can edit the title, description, price, condition, photos, and specifics
    directly in the dashboard before anything is sent anywhere. Add or remove photos at any point
@@ -91,11 +97,11 @@ again.
 
 ## Known things to double check before relying on this for real inventory
 
-- **Condition**: Claude proposes a condition (New, New-Other, Used Excellent/Very Good/Good/
+- **Condition**: the AI proposes a condition (New, New-Other, Used Excellent/Very Good/Good/
   Acceptable, or For Parts/Not Working) based on the photo and notes, editable in the dashboard
   before pushing. Still worth double-checking — condition assessment from a photo alone has real
   limits, and it directly affects buyer expectations and return risk.
-- **Category**: Claude proposes a product-type search phrase per item (e.g. "hydraulic spin-on
+- **Category**: the AI proposes a product-type search phrase per item (e.g. "hydraulic spin-on
   filter"), which the app looks up against eBay's real category tree via the Taxonomy API and
   stores the matching leaf category — shown and searchable/overridable in the dashboard. The
   automatic top match isn't always the most specific one (e.g. it may pick a generic "Filters"
@@ -104,7 +110,7 @@ again.
 - **Access tokens**: the eBay service fetches a fresh access token on every request for
   simplicity. This works fine at low volume; if you start batch-pushing many items at once,
   you may want to cache the token for its ~2 hour lifetime.
-- **Pricing**: Claude's price suggestions are rough estimates based on general knowledge, not
+- **Pricing**: the AI's price suggestions are rough estimates based on general knowledge, not
   live comps. Worth spot-checking against actual sold listings before publishing, especially
   for less common parts.
 - **Photos require the R2 env vars to be filled in** — each photo is uploaded to your R2 bucket
@@ -119,7 +125,9 @@ ebay-app/
 ├── db.js                  # SQLite schema/setup
 ├── routes/parts.js        # API routes: upload, list, edit, photos add/remove, publish
 ├── services/
-│   ├── claudeService.js   # Calls Claude API to identify part + draft listing
+│   ├── aiService.js       # Picks the AI provider below based on AI_PROVIDER
+│   ├── kimiService.js     # Calls Kimi K2.6 (via NVIDIA NIM) to identify part + draft listing
+│   ├── claudeService.js   # Calls Claude API to identify part + draft listing (fallback provider)
 │   ├── ebayService.js     # Calls eBay Inventory API (create/update item+offer, publish)
 │   └── r2Service.js       # Uploads photos to Cloudflare R2 for eBay's imageUrls
 ├── public/                # Dashboard (HTML/CSS/JS, no build step)
