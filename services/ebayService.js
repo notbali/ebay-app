@@ -9,16 +9,26 @@ const TOKEN_URL = process.env.EBAY_ENV === 'sandbox'
   ? 'https://api.sandbox.ebay.com/identity/v1/oauth2/token'
   : 'https://api.ebay.com/identity/v1/oauth2/token';
 
+// User-consent redirect endpoint for the 3-legged OAuth flow (routes/ebayAuth.js) - distinct
+// from TOKEN_URL, which is the identity API's token-exchange endpoint.
+const AUTHORIZE_URL = process.env.EBAY_ENV === 'sandbox'
+  ? 'https://auth.sandbox.ebay.com/oauth2/authorize'
+  : 'https://auth.ebay.com/oauth2/authorize';
+
 // eBay access tokens from a refresh token are short-lived (~2 hrs). We fetch a fresh one
 // per request rather than caching, to keep this simple and avoid stale-token bugs.
-async function getAccessToken() {
+// refreshToken is this seller's own token (routes/ebayAuth.js's OAuth flow), not a shared
+// app-level credential - every seller only ever authorizes their own eBay account.
+async function getAccessToken(refreshToken) {
+  if (!refreshToken) throw new Error('Missing eBay refresh token for this seller');
+
   const basicAuth = Buffer.from(
     `${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`
   ).toString('base64');
 
   const params = new URLSearchParams();
   params.append('grant_type', 'refresh_token');
-  params.append('refresh_token', process.env.EBAY_REFRESH_TOKEN);
+  params.append('refresh_token', refreshToken);
   params.append(
     'scope',
     'https://api.ebay.com/oauth/api_scope/sell.inventory'
@@ -213,10 +223,10 @@ async function getValidConditions(categoryId) {
 }
 
 // eBay fetches listing images itself from a public HTTPS URL - it can never reach localhost -
-// so each photo is uploaded to R2 and eBay is given the resulting public URLs.
+// so each photo is uploaded to R2 (namespaced per seller) and eBay is given the resulting URLs.
 async function buildImageUrls(part) {
   const photoPaths = JSON.parse(part.photo_paths_json || '[]');
-  return Promise.all(photoPaths.map(uploadPartPhoto));
+  return Promise.all(photoPaths.map((p) => uploadPartPhoto(p, part.user_id)));
 }
 
 async function putInventoryItem(token, part, sku) {
@@ -271,7 +281,7 @@ async function putInventoryItem(token, part, sku) {
   }
 }
 
-function offerBody(part, sku) {
+function offerBody(part, sku, ebayCreds) {
   return {
     sku,
     marketplaceId: process.env.EBAY_MARKETPLACE_ID || 'EBAY_US',
@@ -286,26 +296,27 @@ function offerBody(part, sku) {
       },
     },
     listingPolicies: {
-      fulfillmentPolicyId: process.env.EBAY_FULFILLMENT_POLICY_ID,
-      paymentPolicyId: process.env.EBAY_PAYMENT_POLICY_ID,
-      returnPolicyId: process.env.EBAY_RETURN_POLICY_ID,
-      // The referenced fulfillment policy is set up (in Seller Hub) to use calculated shipping
-      // based on the buyer's location. This override zeroes the cost for just this offer when
-      // the seller wants free shipping, without touching the policy used by every other listing.
+      fulfillmentPolicyId: ebayCreds.fulfillmentPolicyId,
+      paymentPolicyId: ebayCreds.paymentPolicyId,
+      returnPolicyId: ebayCreds.returnPolicyId,
+      // The referenced fulfillment policy is set up (in the seller's own Seller Hub) to use
+      // calculated shipping based on the buyer's location. This override zeroes the cost for
+      // just this offer when the seller wants free shipping, without touching the policy used
+      // by every other listing.
       ...(part.ai_free_shipping ? {
         shippingCostOverrides: [
           { priority: 1, shippingServiceType: 'DOMESTIC', shippingCost: { value: '0.00', currency: 'USD' } },
         ],
       } : {}),
     },
-    merchantLocationKey: process.env.EBAY_MERCHANT_LOCATION_KEY,
+    merchantLocationKey: ebayCreds.merchantLocationKey,
   };
 }
 
 // Reuses an existing offer (PUT) if this part already has one from a prior attempt, rather than
 // always creating a new one - otherwise every retry after a fixable error (e.g. a missing photo)
 // leaves an orphaned duplicate unpublished offer sitting on the seller's account.
-async function ensureOffer(token, part, sku) {
+async function ensureOffer(token, part, sku, ebayCreds) {
   const existingOfferId = part.ebay_offer_id;
 
   const res = await fetch(
@@ -319,7 +330,7 @@ async function ensureOffer(token, part, sku) {
         Authorization: `Bearer ${token}`,
         'Content-Language': 'en-US',
       },
-      body: JSON.stringify(offerBody(part, sku)),
+      body: JSON.stringify(offerBody(part, sku, ebayCreds)),
     }
   );
 
@@ -351,13 +362,13 @@ async function publishOfferById(token, offerId) {
 // one if this part was already pushed before), then publish. If the item+offer succeed but
 // publish itself fails, the error carries the sku/offerId so the caller can persist them -
 // the next retry then reuses that offer instead of minting another orphaned one.
-async function publishListing(part) {
-  const token = await getAccessToken();
+async function publishListing(part, ebayCreds) {
+  const token = await getAccessToken(ebayCreds.refreshToken);
   const sku = part.ebay_sku || `IND-${part.id}-${Date.now()}`;
 
   await validateCondition(part);
   await putInventoryItem(token, part, sku);
-  const offerId = await ensureOffer(token, part, sku);
+  const offerId = await ensureOffer(token, part, sku, ebayCreds);
 
   try {
     const result = await publishOfferById(token, offerId);
@@ -369,4 +380,4 @@ async function publishListing(part) {
   }
 }
 
-module.exports = { publishListing, suggestCategories, getValidConditions };
+module.exports = { publishListing, suggestCategories, getValidConditions, TOKEN_URL, AUTHORIZE_URL };

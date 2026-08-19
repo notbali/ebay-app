@@ -41,36 +41,74 @@
         </svg>
       </div>
       <p>Upload a part, AI charts the listing, you review it, then it sails to eBay.</p>
+      <div class="account-bar" id="account-bar" hidden>
+        <span class="badge" id="ebay-status-badge">Not connected</span>
+        <button type="button" class="secondary" id="settings-btn">Settings</button>
+        <button type="button" class="secondary" id="logout-btn">Logout</button>
+      </div>
     </div>
   </header>
 
   <main>
-    <section id="upload-section">
-      <h2 class="reveal-on-load">Prepare Cargo<span class="subhead">Photos and notes in, a drafted listing out</span></h2>
-      <div class="upload-panel" id="upload-panel">
-        <form id="upload-form">
-          <label>
-            Photos (up to 12)
-            <div id="photo-dropzone" class="dropzone">
-              <p>Drag &amp; drop photos here, or click to browse</p>
-              <input type="file" id="photo-input" name="photos" accept="image/*" multiple hidden />
-            </div>
-            <div id="photo-preview" class="photo-preview"></div>
-          </label>
-          <label>
-            Notes / part number / spec sheet text (optional but helps accuracy)
-            <textarea id="notes-input" name="notes" rows="4" placeholder="e.g. Omron relay, pulled from line 3, model illegible on label but 24VDC coil, 8-pin"></textarea>
-          </label>
-          <button type="submit">Chart the Voyage</button>
+    <section id="auth-section" class="auth-section" hidden>
+      <h2 class="reveal-on-load">Come Aboard<span class="subhead">Sign in or create an account to start listing</span></h2>
+      <div class="upload-panel">
+        <form id="login-form">
+          <label>Email<input type="email" id="login-email" required autocomplete="email" /></label>
+          <label>Password<input type="password" id="login-password" required autocomplete="current-password" /></label>
+          <button type="submit">Log In</button>
+          <div id="login-status" class="error" aria-live="polite"></div>
         </form>
-        <div id="upload-status" aria-live="polite"></div>
+        <p class="muted" id="show-signup-wrap">New here? <a href="#" id="show-signup">Create an account</a></p>
+
+        <form id="signup-form" hidden>
+          <label>Email<input type="email" id="signup-email" required autocomplete="email" /></label>
+          <label>Password (min 8 characters)<input type="password" id="signup-password" required minlength="8" autocomplete="new-password" /></label>
+          <button type="submit">Create Account</button>
+          <div id="signup-status" class="error" aria-live="polite"></div>
+        </form>
+        <p class="muted" id="show-login-wrap" hidden>Already have an account? <a href="#" id="show-login">Log in</a></p>
       </div>
     </section>
 
-    <section id="drafts-section">
-      <h2 class="reveal-on-load">Voyage Manifest<span class="subhead">Every listing, from port to delivered</span></h2>
-      <div id="drafts-list"></div>
+    <section id="connect-gate-section" class="connect-gate" hidden>
+      <h2 class="reveal-on-load">Connect Your eBay Account<span class="subhead">Authorize The Bali Bay to list on your behalf</span></h2>
+      <div class="upload-panel">
+        <p>Before you can chart a voyage, connect your own eBay seller account. Everything you publish goes live under <strong>your</strong> eBay account, not ours.</p>
+        <div id="connect-gate-status" aria-live="polite"></div>
+        <button type="button" id="connect-ebay-btn">Connect eBay Account</button>
+      </div>
     </section>
+
+    <div id="dashboard" hidden>
+      <section id="upload-section">
+        <h2 class="reveal-on-load">Prepare Cargo<span class="subhead">Photos and notes in, a drafted listing out</span></h2>
+        <div class="upload-panel" id="upload-panel">
+          <form id="upload-form">
+            <label>
+              Photos (up to 12)
+              <div id="photo-dropzone" class="dropzone">
+                <p>Drag &amp; drop photos here, or click to browse</p>
+                <input type="file" id="photo-input" name="photos" accept="image/*" multiple hidden />
+              </div>
+              <div id="photo-preview" class="photo-preview"></div>
+            </label>
+            <label>
+              Notes / part number / spec sheet text (optional but helps accuracy)
+              <textarea id="notes-input" name="notes" rows="4" placeholder="e.g. Omron relay, pulled from line 3, model illegible on label but 24VDC coil, 8-pin"></textarea>
+            </label>
+            <button type="submit">Chart the Voyage</button>
+          </form>
+          <div id="upload-status" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section id="drafts-section">
+        <h2 class="reveal-on-load">Voyage Manifest<span class="subhead">Every listing, from port to delivered</span></h2>
+        <div id="harbor-board"></div>
+        <div id="drafts-list"></div>
+      </section>
+    </div>
   </main>
 
   <footer class="site-footer">
