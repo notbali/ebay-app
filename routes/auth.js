@@ -4,6 +4,7 @@ const { hashPassword, verifyPassword, createSessionToken, verifyCookieValue } = 
 const {
   parseCookies, setSessionCookie, clearSessionCookie, createSession, destroySessionByToken, getSessionUser, COOKIE_NAME,
 } = require('../middleware/auth');
+const { checkRateLimit, resetRateLimit } = require('../services/rateLimitService');
 
 const router = express.Router();
 
@@ -11,7 +12,13 @@ function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+// Keyed by IP alone (not IP+email) so an attacker can't dodge the limit by spraying different
+// emails from the same source, and a distributed attack still has to burn many IPs either way.
 router.post('/signup', (req, res) => {
+  if (!checkRateLimit(`signup:${req.ip}`, { maxAttempts: 5, windowMs: 60 * 60 * 1000 })) {
+    return res.status(429).json({ error: 'Too many signup attempts. Please try again later.' });
+  }
+
   const email = normalizeEmail(req.body.email);
   const password = String(req.body.password || '');
 
@@ -41,6 +48,11 @@ router.post('/signup', (req, res) => {
 });
 
 router.post('/login', (req, res) => {
+  const rateLimitKey = `login:${req.ip}`;
+  if (!checkRateLimit(rateLimitKey, { maxAttempts: 10, windowMs: 15 * 60 * 1000 })) {
+    return res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+  }
+
   const email = normalizeEmail(req.body.email);
   const password = String(req.body.password || '');
 
@@ -51,6 +63,7 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: 'Incorrect email or password' });
   }
 
+  resetRateLimit(rateLimitKey);
   const token = createSessionToken();
   createSession(user.id, token);
   setSessionCookie(res, token);

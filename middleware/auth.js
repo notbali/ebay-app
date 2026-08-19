@@ -59,6 +59,14 @@ function destroySessionByToken(token) {
   db.prepare('DELETE FROM sessions WHERE id = ?').run(hashSessionToken(token));
 }
 
+// Expired sessions are already rejected on lookup (getSessionUser below deletes them lazily,
+// one row at a time, only when someone happens to present that exact expired cookie) - this
+// sweeps the rest so the table doesn't grow unbounded from sessions nobody ever presents again.
+// Takes a db instance (defaulting to the real one) so it's testable against an isolated DB.
+function pruneExpiredSessions(dbInstance = db) {
+  dbInstance.prepare('DELETE FROM sessions WHERE expires_at < ?').run(new Date().toISOString());
+}
+
 // Resolves the logged-in user (or null) from the request's session cookie, without rejecting -
 // used by requireAuth and by routes that want to know the user optionally (e.g. GET /api/auth/me).
 function getSessionUser(req) {
@@ -96,4 +104,5 @@ module.exports = {
   destroySessionByToken,
   getSessionUser,
   requireAuth,
+  pruneExpiredSessions,
 };

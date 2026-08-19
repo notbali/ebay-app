@@ -1,23 +1,22 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const { generateListing } = require('../services/aiService');
 const { publishListing, suggestCategories, getValidConditions } = require('../services/ebayService');
 const { getUserEbayCreds } = require('../services/ebayAccountService');
 const { requireAuth } = require('../middleware/auth');
+const { UPLOAD_DIR, safeUploadFilename, isAllowedImageMimetype } = require('../services/uploadService');
 
 const router = express.Router();
-
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 
 const upload = multer({
   storage: multer.diskStorage({
     destination: UPLOAD_DIR,
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`),
+    filename: (req, file, cb) => cb(null, safeUploadFilename(file.originalname)),
   }),
   limits: { fileSize: 10 * 1024 * 1024, files: 12 }, // 10MB per file, up to 12 photos (eBay's per-listing limit)
+  fileFilter: (req, file, cb) => cb(null, isAllowedImageMimetype(file.mimetype)),
 });
 
 router.use(requireAuth);

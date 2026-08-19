@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node --experimental-sqlite server.js",
-    "dev": "node --watch --experimental-sqlite server.js"
+    "dev": "node --watch --experimental-sqlite server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

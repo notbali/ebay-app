@@ -2,15 +2,21 @@ const express = require('express');
 const fetch = require('node-fetch');
 const { requireAuth, getSessionUser } = require('../middleware/auth');
 const { signCookieValue, verifyCookieValue } = require('../services/authService');
-const { TOKEN_URL, AUTHORIZE_URL } = require('../services/ebayService');
+const { TOKEN_URL, AUTHORIZE_URL, listSellerLocations, listSellerPolicies } = require('../services/ebayService');
 const {
-  saveUserEbayTokens, updateUserEbaySettings, disconnectUser, getConnection,
+  saveUserEbayTokens, updateUserEbaySettings, disconnectUser, getConnection, getRefreshToken,
 } = require('../services/ebayAccountService');
 
 const router = express.Router();
 
-// Same selling scope used by the existing per-request access-token exchange in ebayService.js.
-const SCOPE = 'https://api.ebay.com/oauth/api_scope/sell.inventory';
+// sell.inventory covers listing/publishing (and merchant-location lookups); sell.account.readonly
+// is only needed so Settings can show the seller's real business policies as a picker instead of
+// raw policy-ID text fields. Sellers who connected before this scope was added will need to
+// reconnect once to pick it up - see the /policies route below.
+const SCOPE = [
+  'https://api.ebay.com/oauth/api_scope/sell.inventory',
+  'https://api.ebay.com/oauth/api_scope/sell.account.readonly',
+].join(' ');
 const STATE_TTL_MS = 10 * 60 * 1000;
 
 function secret() {
@@ -104,6 +110,35 @@ router.get('/status', requireAuth, (req, res) => {
 router.post('/disconnect', requireAuth, (req, res) => {
   disconnectUser(req.user.id);
   res.json({ success: true });
+});
+
+// For Settings' pickers: the seller's real merchant locations and business policies, straight
+// from eBay, so they select what they already recognize instead of hunting for raw IDs.
+router.get('/locations', requireAuth, async (req, res) => {
+  const refreshToken = getRefreshToken(req.user.id);
+  if (!refreshToken) return res.status(400).json({ error: 'Connect your eBay account first' });
+
+  try {
+    res.json(await listSellerLocations(refreshToken));
+  } catch (err) {
+    console.error('eBay location lookup failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/policies', requireAuth, async (req, res) => {
+  const refreshToken = getRefreshToken(req.user.id);
+  if (!refreshToken) return res.status(400).json({ error: 'Connect your eBay account first' });
+
+  try {
+    res.json(await listSellerPolicies(refreshToken));
+  } catch (err) {
+    console.error('eBay policy lookup failed:', err.message);
+    // Most common cause: this connection predates the sell.account.readonly scope. Flag it
+    // distinctly so the dashboard can prompt "reconnect" instead of a generic error.
+    const needsReconnect = /invalid_scope|insufficient|unauthorized/i.test(err.message);
+    res.status(needsReconnect ? 409 : 500).json({ error: err.message, needsReconnect });
+  }
 });
 
 router.get('/settings', requireAuth, (req, res) => {

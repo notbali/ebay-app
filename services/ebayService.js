@@ -19,7 +19,7 @@ const AUTHORIZE_URL = process.env.EBAY_ENV === 'sandbox'
 // per request rather than caching, to keep this simple and avoid stale-token bugs.
 // refreshToken is this seller's own token (routes/ebayAuth.js's OAuth flow), not a shared
 // app-level credential - every seller only ever authorizes their own eBay account.
-async function getAccessToken(refreshToken) {
+async function getAccessToken(refreshToken, scope = 'https://api.ebay.com/oauth/api_scope/sell.inventory') {
   if (!refreshToken) throw new Error('Missing eBay refresh token for this seller');
 
   const basicAuth = Buffer.from(
@@ -29,10 +29,7 @@ async function getAccessToken(refreshToken) {
   const params = new URLSearchParams();
   params.append('grant_type', 'refresh_token');
   params.append('refresh_token', refreshToken);
-  params.append(
-    'scope',
-    'https://api.ebay.com/oauth/api_scope/sell.inventory'
-  );
+  params.append('scope', scope);
 
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -79,6 +76,59 @@ async function getAppAccessToken() {
 
   const data = await res.json();
   return data.access_token;
+}
+
+// Lets Settings show the seller's real merchant locations as a picker instead of a raw
+// "paste your location key" text field - uses the same sell.inventory-scoped token as
+// publishing, so it works for every already-connected seller with no reconnect needed.
+async function listSellerLocations(refreshToken) {
+  const token = await getAccessToken(refreshToken);
+  const res = await fetch(`${BASE_URL}/sell/inventory/v1/location`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`eBay location lookup failed (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  return (data.locations || []).map((l) => {
+    const addr = l.location?.address || {};
+    const place = [addr.city, addr.stateOrProvince, addr.postalCode].filter(Boolean).join(', ');
+    return {
+      key: l.merchantLocationKey,
+      label: [l.name || l.merchantLocationKey, place].filter(Boolean).join(' — '),
+    };
+  });
+}
+
+const ACCOUNT_READONLY_SCOPE = 'https://api.ebay.com/oauth/api_scope/sell.account.readonly';
+
+async function fetchPolicyList(url, token, arrayKey, idKey) {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`eBay policy lookup failed (${res.status}): ${errText}`);
+  }
+  const data = await res.json();
+  return (data[arrayKey] || []).map((p) => ({ id: p[idKey], label: p.name }));
+}
+
+// Lets Settings show the seller's real business policies as pickers instead of raw policy-ID
+// text fields. Needs the sell.account.readonly scope, which older connections (from before this
+// existed) won't have - callers should expect this to throw for those and prompt a reconnect.
+async function listSellerPolicies(refreshToken) {
+  const token = await getAccessToken(refreshToken, ACCOUNT_READONLY_SCOPE);
+  const marketplaceId = process.env.EBAY_MARKETPLACE_ID || 'EBAY_US';
+
+  const [fulfillment, payment, returnPolicies] = await Promise.all([
+    fetchPolicyList(`${BASE_URL}/sell/account/v1/fulfillment_policy?marketplace_id=${marketplaceId}`, token, 'fulfillmentPolicies', 'fulfillmentPolicyId'),
+    fetchPolicyList(`${BASE_URL}/sell/account/v1/payment_policy?marketplace_id=${marketplaceId}`, token, 'paymentPolicies', 'paymentPolicyId'),
+    fetchPolicyList(`${BASE_URL}/sell/account/v1/return_policy?marketplace_id=${marketplaceId}`, token, 'returnPolicies', 'returnPolicyId'),
+  ]);
+
+  return { fulfillment, payment, return: returnPolicies };
 }
 
 let cachedCategoryTreeId = null;
@@ -380,4 +430,7 @@ async function publishListing(part, ebayCreds) {
   }
 }
 
-module.exports = { publishListing, suggestCategories, getValidConditions, TOKEN_URL, AUTHORIZE_URL };
+module.exports = {
+  publishListing, suggestCategories, getValidConditions, listSellerLocations, listSellerPolicies,
+  TOKEN_URL, AUTHORIZE_URL,
+};

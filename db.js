@@ -2,7 +2,10 @@ const { DatabaseSync } = require('node:sqlite');
 const fs = require('fs');
 const path = require('path');
 
-const dataDir = path.join(__dirname, 'data');
+// DATA_DIR lets a deployment host's persistent disk (mounted somewhere outside this repo's own
+// directory, e.g. Render) hold the DB across deploys/restarts - defaults to a local ./data folder
+// for dev, where the repo's own filesystem is already persistent.
+const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 
 const db = new DatabaseSync(path.join(dataDir, 'app.db'));

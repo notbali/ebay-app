@@ -99,14 +99,51 @@ account from the gate screen or Settings.
 The eBay OAuth consent flow needs the app reachable at a **stable** public HTTPS URL - eBay
 redirects the seller's browser back to a pre-registered callback URL after they approve access,
 so a URL that changes on every restart (like a Cloudflare *quick* tunnel's random
-`trycloudflare.com` hostname) will break reconnecting later. Use a Cloudflare **named** tunnel
-bound to a fixed hostname on a domain in your Cloudflare account instead, pointed at this app's
-local port.
+`trycloudflare.com` hostname) will break reconnecting later.
 
-Then, one-time, in your eBay Developer Account (Application Keys → "eBay Redirect URL"):
-register (or reuse) a RuName whose Accept URL is `<your fixed tunnel hostname>/api/ebay/callback`,
-and set `EBAY_OAUTH_REDIRECT_URI` in `.env` to that RuName (it's a token eBay issues, not the
-literal URL itself) and `PUBLIC_BASE_URL` to the tunnel's HTTPS origin.
+For quick local testing, a Cloudflare **named** tunnel bound to a fixed hostname works (a *quick*
+tunnel is fine for a one-off manual test, but its random hostname breaks on every restart). For
+actually running this for real sellers, deploy it properly instead - see the next section.
+
+Either way, one-time in your eBay Developer Account (Application Keys → "eBay Redirect URL"):
+register (or reuse) a RuName whose Accept URL is `<your public origin>/api/ebay/callback`, and set
+`EBAY_OAUTH_REDIRECT_URI` in `.env` to that RuName (it's a token eBay issues, not the literal URL
+itself) and `PUBLIC_BASE_URL` to that public HTTPS origin.
+
+## Deploying to Render
+
+This app is a single long-running Node process with a local SQLite DB (`node:sqlite`) and local
+file uploads - it needs a host with a **persistent disk** and a process that stays running, not a
+serverless/edge platform (Vercel's serverless functions have no persistent filesystem and won't
+work here). Render and Fly.io both fit; these steps are for Render.
+
+`render.yaml` in this repo is a Blueprint Render can build the service from directly. Steps:
+
+1. **Push this repo to GitHub** (Render deploys from a connected git repo).
+2. **Persistent disk requires a paid Render plan** - Free doesn't support disks at all. Check
+   Render's current pricing page for the cheapest plan that does; `render.yaml` defaults to
+   `starter` as a starting point, adjust if needed.
+3. In the Render dashboard: **New → Blueprint**, connect this repo. Render reads `render.yaml`
+   and creates the web service + disk automatically.
+4. Fill in the environment variables Render prompts for during Blueprint creation (everything
+   marked `sync: false` in `render.yaml`) - your AI provider key, eBay Client ID/Secret,
+   `TOKEN_ENCRYPTION_KEY` (generate it the same way as in local setup - see `.env.example` -
+   `render.yaml` deliberately doesn't auto-generate this one, since it must be exact 32-byte hex
+   and Render's auto-generated values aren't hex-formatted), and R2 credentials. Leave
+   `EBAY_OAUTH_REDIRECT_URI` and `PUBLIC_BASE_URL` blank for now - you don't know the assigned URL
+   yet.
+5. Deploy. Render assigns a stable `https://<something>.onrender.com` URL (or attach your own
+   custom domain).
+6. **Now go back and fill in the two you skipped**: set `PUBLIC_BASE_URL` to that URL, and in your
+   eBay Developer Account register/update a RuName with Accept URL
+   `<that URL>/api/ebay/callback`, then set `EBAY_OAUTH_REDIRECT_URI` to the resulting RuName.
+   Redeploy (or just let Render's env var change trigger one).
+7. Visit the deployed URL and sign up for real - this is a separate account from anything you
+   created during local testing (different database entirely).
+
+Note: a service with an attached disk can't be horizontally scaled on Render - fine for this
+app's scale (also relevant: session state and the login rate limiter are both in-process/in
+memory, so this app assumes a single instance regardless of host).
 
 ## How the review → publish flow works
 

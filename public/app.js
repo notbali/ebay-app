@@ -1120,32 +1120,91 @@ document.getElementById('connect-ebay-btn').addEventListener('click', () => {
 
 document.getElementById('settings-btn').addEventListener('click', openEbaySettingsModal);
 
-async function openEbaySettingsModal() {
-  const settings = await (await fetch('/api/ebay/settings')).json();
+// Builds a <select>'s options from eBay's real list of an item type (locations or one policy
+// type). If the currently-saved value isn't in that list (stale ID, or eBay-side deletion), it's
+// kept as a separate labeled option instead of silently dropped, so Save doesn't clobber it.
+function buildPickerOptions(items, idKey, labelKey, currentValue) {
+  const known = items.some((item) => item[idKey] === currentValue);
+  const opts = items.map((item) =>
+    `<option value="${escapeAttr(item[idKey])}" ${item[idKey] === currentValue ? 'selected' : ''}>${escapeAttr(item[labelKey])}</option>`
+  );
+  if (currentValue && !known) {
+    opts.unshift(`<option value="${escapeAttr(currentValue)}" selected>Current: ${escapeAttr(currentValue)}</option>`);
+  }
+  return `<option value="">Select...</option>${opts.join('')}`;
+}
 
+async function openEbaySettingsModal() {
   const backdrop = openModal(`
     <h3 class="reveal-on-load">eBay Settings</h3>
-    <p class="muted">Paste these from your own eBay Seller Hub (see the README for where to find each one).</p>
+    <p class="muted">Loading your eBay locations and business policies&hellip;</p>
+  `);
+  revealNow(backdrop.querySelector('h3'));
+
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
+
+  const [settings, locationsRes, policiesRes] = await Promise.all([
+    fetch('/api/ebay/settings').then((r) => r.json()),
+    fetch('/api/ebay/locations'),
+    fetch('/api/ebay/policies'),
+  ]);
+
+  const locations = locationsRes.ok ? await locationsRes.json() : [];
+  const locationsError = locationsRes.ok ? null : await describeError(locationsRes);
+
+  const policiesData = await policiesRes.json().catch(() => ({}));
+  const policiesOk = policiesRes.ok;
+  const needsReconnect = !policiesOk && policiesData.needsReconnect;
+  const policies = policiesOk ? policiesData : { fulfillment: [], payment: [], return: [] };
+
+  const panel = backdrop.querySelector('.modal-panel');
+  panel.innerHTML = `
+    <h3 class="reveal-on-load">eBay Settings</h3>
+    <p class="muted">Picked live from your own eBay Seller Hub account.</p>
     <form id="ebay-settings-form">
-      <label>Merchant Location Key<input type="text" name="merchantLocationKey" value="${escapeAttr(settings.merchantLocationKey)}" /></label>
-      <label>Fulfillment Policy ID<input type="text" name="fulfillmentPolicyId" value="${escapeAttr(settings.fulfillmentPolicyId)}" /></label>
-      <label>Payment Policy ID<input type="text" name="paymentPolicyId" value="${escapeAttr(settings.paymentPolicyId)}" /></label>
-      <label>Return Policy ID<input type="text" name="returnPolicyId" value="${escapeAttr(settings.returnPolicyId)}" /></label>
+      <label>Ship-From Location
+        <select name="merchantLocationKey" ${locationsError ? 'disabled' : ''}>
+          ${buildPickerOptions(locations, 'key', 'label', settings.merchantLocationKey)}
+        </select>
+      </label>
+      ${locationsError ? `<p class="error">Couldn't load locations: ${escapeAttr(locationsError)}</p>` : ''}
+
+      ${needsReconnect ? `
+        <p class="error">Business policies need one more eBay permission this connection doesn't have yet.</p>
+        <button type="button" class="secondary" data-action="reconnect">Reconnect eBay Account</button>
+      ` : `
+        <label>Fulfillment (Shipping) Policy
+          <select name="fulfillmentPolicyId" ${!policiesOk ? 'disabled' : ''}>
+            ${buildPickerOptions(policies.fulfillment, 'id', 'label', settings.fulfillmentPolicyId)}
+          </select>
+        </label>
+        <label>Payment Policy
+          <select name="paymentPolicyId" ${!policiesOk ? 'disabled' : ''}>
+            ${buildPickerOptions(policies.payment, 'id', 'label', settings.paymentPolicyId)}
+          </select>
+        </label>
+        <label>Return Policy
+          <select name="returnPolicyId" ${!policiesOk ? 'disabled' : ''}>
+            ${buildPickerOptions(policies.return, 'id', 'label', settings.returnPolicyId)}
+          </select>
+        </label>
+        ${!policiesOk ? `<p class="error">Couldn't load policies: ${escapeAttr(policiesData.error || 'unknown error')}</p>` : ''}
+      `}
+
       <div id="ebay-settings-status" aria-live="polite"></div>
       <div class="modal-actions">
         <button type="button" class="danger" data-action="disconnect">Disconnect eBay</button>
         <button type="button" class="secondary" data-action="close">Close</button>
-        <button type="submit">Save</button>
+        <button type="submit" ${needsReconnect ? 'disabled' : ''}>Save</button>
       </div>
     </form>
-  `);
-  revealNow(backdrop.querySelector('h3'));
+  `;
+  revealNow(panel.querySelector('h3'));
 
   const form = backdrop.querySelector('#ebay-settings-form');
   const statusEl = backdrop.querySelector('#ebay-settings-status');
 
   backdrop.querySelector('[data-action="close"]').addEventListener('click', () => closeModal(backdrop));
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
 
   backdrop.querySelector('[data-action="disconnect"]').addEventListener('click', async () => {
     if (!confirm('Disconnect your eBay account? You will need to reconnect before publishing again.')) return;
@@ -1154,13 +1213,18 @@ async function openEbaySettingsModal() {
     boot();
   });
 
+  const reconnectBtn = backdrop.querySelector('[data-action="reconnect"]');
+  if (reconnectBtn) {
+    reconnectBtn.addEventListener('click', () => { window.location.href = '/api/ebay/connect'; });
+  }
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const body = {
-      merchantLocationKey: form.merchantLocationKey.value.trim(),
-      fulfillmentPolicyId: form.fulfillmentPolicyId.value.trim(),
-      paymentPolicyId: form.paymentPolicyId.value.trim(),
-      returnPolicyId: form.returnPolicyId.value.trim(),
+      merchantLocationKey: form.merchantLocationKey.value,
+      fulfillmentPolicyId: form.fulfillmentPolicyId ? form.fulfillmentPolicyId.value : settings.fulfillmentPolicyId,
+      paymentPolicyId: form.paymentPolicyId ? form.paymentPolicyId.value : settings.paymentPolicyId,
+      returnPolicyId: form.returnPolicyId ? form.returnPolicyId.value : settings.returnPolicyId,
     };
     const res = await fetch('/api/ebay/settings', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),

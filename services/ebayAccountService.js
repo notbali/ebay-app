@@ -42,6 +42,14 @@ function disconnectUser(userId) {
   db.prepare('DELETE FROM ebay_connections WHERE user_id = ?').run(userId);
 }
 
+// For Settings' location/policy pickers, which need the seller's raw refresh token before any
+// policies are configured yet - unlike getUserEbayCreds(), this doesn't require settings to
+// already be filled in.
+function getRefreshToken(userId) {
+  const conn = getConnection(userId);
+  return conn ? decrypt(conn.refresh_token_encrypted) : null;
+}
+
 // Resolves everything services/ebayService.js needs to publish on this user's behalf. Throws a
 // clear, seller-facing error (surfaced by routes/parts.js's publish route) rather than a generic
 // null-pointer failure deep inside the eBay API call chain.
@@ -70,4 +78,5 @@ module.exports = {
   updateUserEbaySettings,
   disconnectUser,
   getUserEbayCreds,
+  getRefreshToken,
 };
