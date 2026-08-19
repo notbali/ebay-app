@@ -1,0 +1,74 @@
+# Render Blueprint - see README.md "Deploying to Render" for the full walkthrough.
+#
+# Persistent disk requires a paid Render plan (not available on Free) - see
+# https://render.com/docs/disks. "starter" below is a starting point; check Render's current
+# pricing page for the actual cheapest plan that supports disks before deploying.
+#
+# TOKEN_ENCRYPTION_KEY is deliberately NOT generateValue:true - it must be exactly 32 bytes
+# hex-encoded (64 hex chars, see services/cryptoService.js), and Render's generated values are
+# base64, not hex. Generate it yourself the same way as during local setup:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# SESSION_SECRET has no such format requirement (used as an HMAC key, any string works), so it's
+# safe to let Render generate that one.
+services:
+  - name: bali-bay-ebay-app
+    type: web
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/auth/me
+    disk:
+      name: bali-bay-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      # Where the persistent disk holds the SQLite DB and uploaded photos across deploys/restarts.
+      - key: DATA_DIR
+        value: /var/data/db
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+
+      # Accounts & sessions
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      # Fill in once Render assigns your service's URL (or once you attach a custom domain) -
+      # see the README section on updating this and the eBay RuName after first deploy.
+      - key: PUBLIC_BASE_URL
+        sync: false
+
+      # AI provider
+      - key: AI_PROVIDER
+        value: kimi
+      - key: NVIDIA_API_KEY
+        sync: false
+      # - key: NVIDIA_MODEL
+      #   value: moonshotai/kimi-k2.6
+
+      # eBay API
+      - key: EBAY_ENV
+        value: production
+      - key: EBAY_CLIENT_ID
+        sync: false
+      - key: EBAY_CLIENT_SECRET
+        sync: false
+      - key: EBAY_OAUTH_REDIRECT_URI
+        sync: false
+      - key: EBAY_MARKETPLACE_ID
+        value: EBAY_US
+      - key: EBAY_CATEGORY_ID
+        value: "92074"
+
+      # Cloudflare R2 (public photo hosting for eBay's imageUrls)
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_BASE_URL
+        sync: false

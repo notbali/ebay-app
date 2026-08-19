@@ -188,6 +188,16 @@ a:hover { color: var(--foam); }
   font-size: 0.9rem;
 }
 
+/* --- Account bar: connection badge + settings/logout, shown once logged in --- */
+.account-bar { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.9rem; flex-wrap: wrap; }
+.account-bar[hidden] { display: none; }
+.account-bar .badge.connected { background: rgba(110, 146, 186, 0.22); color: var(--current); }
+.account-bar .badge.not-connected { background: rgba(180, 85, 59, 0.16); color: #e29b87; }
+
+/* --- Auth / connect gates: centered, narrower than the full dashboard width --- */
+.auth-section .upload-panel, .connect-gate .upload-panel { max-width: 420px; margin: 0 auto; }
+.auth-section p.muted, .connect-gate p { font-size: 0.88rem; }
+
 main { max-width: 900px; margin: 0 auto; }
 
 section {
@@ -358,6 +368,27 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 
 .shipping-field { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem; color: var(--text-secondary); }
 
+/* --- Specifics ledger: key/value rows, entered on the manifest like cargo line items --- */
+.specifics-ledger { display: flex; flex-direction: column; gap: 0.4rem; }
+.specifics-row { display: flex; gap: 0.5rem; align-items: center; }
+.specifics-row .specifics-key { flex: 0 0 38%; }
+.specifics-row .specifics-value { flex: 1; }
+.specifics-row-remove {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  width: 34px; height: 34px; min-width: 34px; padding: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+}
+.specifics-row-remove:hover:not(:disabled) { background: rgba(180, 85, 59, 0.14); color: #e29b87; border-color: var(--danger); }
+.specifics-add {
+  align-self: flex-start;
+  background: transparent; color: var(--current);
+  border: 1px dashed var(--tide); font-size: 0.82rem; font-weight: 600;
+  padding: 0.4rem 0.7rem;
+}
+.specifics-add:hover:not(:disabled) { background: rgba(110, 146, 186, 0.08); box-shadow: none; border-color: var(--current); }
+.specifics-empty { font-size: 0.82rem; color: var(--text-secondary); font-style: italic; }
+
 /* --- eBay category lookup/search --- */
 .category-field { display: flex; flex-direction: column; gap: 0.4rem; }
 .category-current { font-size: 0.85rem; }
@@ -373,6 +404,40 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 }
 .category-result:hover { border-color: var(--current); background: rgba(110, 146, 186, 0.08); }
 .category-result .muted { font-size: 0.75rem; }
+
+/* ============================================================
+   Harbor board — manifest tally, one line per voyage stage
+   ============================================================ */
+.harbor-board {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: -0.25rem 0 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.harbor-board-item {
+  flex: 1 1 130px;
+  padding: 0.7rem 0.9rem;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 0.15rem;
+}
+.harbor-board-item:last-child { border-right: none; }
+.harbor-board-count {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-heading);
+}
+.harbor-board-item.has-stage .harbor-board-count { color: var(--current); }
+.harbor-board-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
 
 /* ============================================================
    Delete draft — trash icon + confirmation popover
@@ -555,6 +620,9 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   .delete-popover { right: 0; left: 0; margin: 0 auto; }
   .voyage-stage-list { flex-direction: row; flex-wrap: wrap; gap: 0.6rem 1rem; }
   .draft-card:hover { transform: none; }
+  .harbor-board-item { flex: 1 1 45%; border-bottom: 1px solid var(--border); }
+  .specifics-row { flex-wrap: wrap; }
+  .specifics-row .specifics-key, .specifics-row .specifics-value { flex: 1 1 100%; }
 }
 
 /* ============================================================

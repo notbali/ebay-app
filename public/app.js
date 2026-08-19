@@ -2,6 +2,13 @@ const form = document.getElementById('upload-form');
 const statusEl = document.getElementById('upload-status');
 const uploadPanel = document.getElementById('upload-panel');
 const draftsList = document.getElementById('drafts-list');
+const harborBoard = document.getElementById('harbor-board');
+
+const authSection = document.getElementById('auth-section');
+const connectGateSection = document.getElementById('connect-gate-section');
+const dashboard = document.getElementById('dashboard');
+const accountBar = document.getElementById('account-bar');
+const ebayStatusBadge = document.getElementById('ebay-status-badge');
 const dropzone = document.getElementById('photo-dropzone');
 const fileInput = document.getElementById('photo-input');
 const previewEl = document.getElementById('photo-preview');
@@ -23,6 +30,11 @@ const STAGE_BADGES = {
   pushed_to_ebay: ['Delayed at Dock', 'stage-delayed'],
   published: ['Delivered', 'stage-delivered'],
 };
+
+// Fixed left-to-right order for the harbor board tally, regardless of which stages are
+// actually present in this batch of drafts (a stage with zero items still gets a column,
+// so the board always reads as the full route rather than reshuffling as things ship).
+const STAGE_ORDER = ['draft', 'reviewed', 'pushed_to_ebay', 'published'];
 
 function prefersReducedMotion() {
   return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -275,7 +287,7 @@ function startStageCycle(stages, onUpdate, intervalMs = 2200) {
 }
 
 // ============================================================
-// Claude generation — voyage overlay over the "Prepare Cargo" panel
+// AI generation — voyage overlay over the "Prepare Cargo" panel
 // ============================================================
 const GENERATION_STAGES = ['Charting the voyage', 'Preparing the cargo', 'Writing the listing', 'Finalizing the manifest'];
 
@@ -287,7 +299,7 @@ function showGenerationOverlay() {
   overlay.id = 'generation-overlay';
   overlay.innerHTML = `
     <h3 class="reveal-on-load">Charting the voyage&hellip;</h3>
-    ${buildVoyageMap({ originLabel: 'Your Store', destLabel: "Claude's Desk" })}
+    ${buildVoyageMap({ originLabel: 'Your Store', destLabel: "The AI's Desk" })}
     ${buildStageList(GENERATION_STAGES)}
     <div class="voyage-overlay-actions">
       <button type="button" class="secondary" data-action="cancel-generation">Cancel</button>
@@ -354,12 +366,42 @@ form.addEventListener('submit', async (e) => {
 });
 
 // ============================================================
+// Harbor board — a tally of the manifest by stage, always showing every
+// stage (even at zero) so the board reads as the whole route at a glance.
+// ============================================================
+function renderHarborBoard(parts) {
+  if (parts.length === 0) {
+    harborBoard.innerHTML = '';
+    return;
+  }
+  const counts = { draft: 0, reviewed: 0, pushed_to_ebay: 0, published: 0 };
+  parts.forEach((p) => { if (p.status in counts) counts[p.status] += 1; });
+
+  harborBoard.innerHTML = `
+    <div class="harbor-board">
+      ${STAGE_ORDER.map((stage) => {
+        const [label] = STAGE_BADGES[stage];
+        const count = counts[stage];
+        return `
+          <div class="harbor-board-item ${count > 0 ? 'has-stage' : ''}">
+            <span class="harbor-board-count">${count}</span>
+            <span class="harbor-board-label">${escapeAttr(label)}</span>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// ============================================================
 // Drafts list
 // ============================================================
 async function loadDrafts() {
   const res = await fetch('/api/parts');
   const parts = await res.json();
   draftsList.innerHTML = '';
+
+  renderHarborBoard(parts);
 
   if (parts.length === 0) {
     draftsList.innerHTML = '<p class="muted">No cargo in port yet — prepare your first listing above.</p>';
@@ -385,7 +427,6 @@ function renderDraftCard(part) {
   card.className = 'draft-card';
 
   const specifics = JSON.parse(part.ai_specifics_json || '{}');
-  const specificsText = Object.entries(specifics).map(([k, v]) => `${k}: ${v}`).join('\n');
   const photoPaths = JSON.parse(part.photo_paths_json || '[]');
   const isPublished = part.status === 'published';
   const [stageLabel, stageClass] = STAGE_BADGES[part.status] || [part.status, ''];
@@ -459,7 +500,11 @@ function renderDraftCard(part) {
         </div>
         <div class="category-results"></div>
       </div>
-      <textarea data-field="ai_specifics_json" rows="2" placeholder="Specifics (key: value per line)">${specificsText}</textarea>
+      <div class="specifics-field">
+        <label style="font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em;">Specifics</label>
+        <div class="specifics-ledger" data-role="specifics-ledger">${buildSpecificsLedger(specifics)}</div>
+        <button type="button" class="specifics-add" data-action="add-specific">+ Add specific</button>
+      </div>
       ${part.error_message ? `<span class="error">${escapeAttr(part.error_message)}</span>` : ''}
       <div class="actions">
         <button class="secondary" data-action="save">Save edits</button>
@@ -487,8 +532,53 @@ function renderDraftCard(part) {
   setupCategorySearch(card, part.id);
   populateConditionOptions(card, part);
   setupDeletePopover(card, part);
+  setupSpecificsLedger(card);
 
   return card;
+}
+
+// ============================================================
+// Specifics ledger — key/value rows (replaces a raw JSON textarea so
+// editing item specifics reads as manifest line items, not code)
+// ============================================================
+function buildSpecificsLedger(specifics) {
+  const entries = Object.entries(specifics);
+  if (entries.length === 0) {
+    return '<p class="specifics-empty" data-role="specifics-empty">No specifics yet.</p>';
+  }
+  return entries.map(([k, v]) => buildSpecificsRow(k, v)).join('');
+}
+
+function buildSpecificsRow(key = '', value = '') {
+  return `
+    <div class="specifics-row" data-role="specifics-row">
+      <input type="text" class="specifics-key" placeholder="Key (e.g. Brand)" value="${escapeAttr(key)}" />
+      <input type="text" class="specifics-value" placeholder="Value" value="${escapeAttr(value)}" />
+      <button type="button" class="specifics-row-remove" data-action="remove-specific" title="Remove specific">&times;</button>
+    </div>
+  `;
+}
+
+function setupSpecificsLedger(card) {
+  const ledger = card.querySelector('[data-role="specifics-ledger"]');
+  const addBtn = card.querySelector('[data-action="add-specific"]');
+
+  ledger.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="remove-specific"]');
+    if (!btn) return;
+    btn.closest('[data-role="specifics-row"]').remove();
+    if (!ledger.querySelector('[data-role="specifics-row"]')) {
+      ledger.innerHTML = '<p class="specifics-empty" data-role="specifics-empty">No specifics yet.</p>';
+    }
+  });
+
+  addBtn.addEventListener('click', () => {
+    const empty = ledger.querySelector('[data-role="specifics-empty"]');
+    if (empty) empty.remove();
+    ledger.insertAdjacentHTML('beforeend', buildSpecificsRow());
+    const keys = ledger.querySelectorAll('.specifics-key');
+    keys[keys.length - 1].focus();
+  });
 }
 
 // ============================================================
@@ -674,12 +764,11 @@ async function saveDraft(id, card) {
   const lengthIn = card.querySelector('[data-field="ai_length_in"]').value;
   const widthIn = card.querySelector('[data-field="ai_width_in"]').value;
   const heightIn = card.querySelector('[data-field="ai_height_in"]').value;
-  const specificsText = card.querySelector('[data-field="ai_specifics_json"]').value;
-
   const specifics = {};
-  specificsText.split('\n').forEach((line) => {
-    const [k, ...rest] = line.split(':');
-    if (k && rest.length) specifics[k.trim()] = rest.join(':').trim();
+  card.querySelectorAll('[data-role="specifics-row"]').forEach((row) => {
+    const k = row.querySelector('.specifics-key').value.trim();
+    const v = row.querySelector('.specifics-value').value.trim();
+    if (k) specifics[k] = v;
   });
 
   await fetch(`/api/parts/${id}`, {
@@ -916,7 +1005,238 @@ function initBrandShipSpeed() {
   wordmark.addEventListener('focusout', () => setSpeed(1));
 }
 
-loadDrafts();
+// ============================================================
+// Account: login/signup, eBay connect gate, settings, logout
+// ============================================================
+let currentUser = null;
+
+function showView(view) {
+  authSection.hidden = view !== 'auth';
+  connectGateSection.hidden = view !== 'connect';
+  dashboard.hidden = view !== 'dashboard';
+  accountBar.hidden = view === 'auth';
+
+  const shown = view === 'auth' ? authSection : view === 'connect' ? connectGateSection : dashboard;
+  const heading = shown.querySelector('.reveal-on-load');
+  if (heading) revealNow(heading);
+}
+
+function setEbayBadge(connected) {
+  ebayStatusBadge.textContent = connected ? 'Connected' : 'Not connected';
+  ebayStatusBadge.classList.toggle('connected', connected);
+  ebayStatusBadge.classList.toggle('not-connected', !connected);
+}
+
+// Runs once on load: figures out which of the three views (auth / connect-eBay / dashboard)
+// the visitor should land on, based on session + eBay connection state.
+async function boot() {
+  handleEbayRedirectFlag();
+
+  const { user } = await (await fetch('/api/auth/me')).json();
+  currentUser = user;
+  if (!user) return showView('auth');
+
+  const ebayStatus = await (await fetch('/api/ebay/status')).json();
+  setEbayBadge(ebayStatus.connected);
+  if (!ebayStatus.connected) return showView('connect');
+
+  showView('dashboard');
+  loadDrafts();
+}
+
+// After eBay redirects back to "/?ebay=connected" or "/?ebay=error&reason=...", surface a
+// message on the connect gate and strip the query string so a page refresh doesn't re-show it.
+function handleEbayRedirectFlag() {
+  const params = new URLSearchParams(window.location.search);
+  const flag = params.get('ebay');
+  if (!flag) return;
+
+  const statusEl = document.getElementById('connect-gate-status');
+  if (flag === 'error') {
+    const reason = params.get('reason') || 'unknown_error';
+    statusEl.textContent = `Couldn't connect your eBay account (${reason}). Please try again.`;
+    statusEl.className = 'error';
+  } else if (flag === 'connected') {
+    statusEl.textContent = 'eBay account connected.';
+    statusEl.className = '';
+  }
+  window.history.replaceState({}, '', window.location.pathname);
+}
+
+document.getElementById('show-signup').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('login-form').hidden = true;
+  document.getElementById('show-signup-wrap').hidden = true;
+  document.getElementById('signup-form').hidden = false;
+  document.getElementById('show-login-wrap').hidden = false;
+});
+document.getElementById('show-login').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('signup-form').hidden = true;
+  document.getElementById('show-login-wrap').hidden = true;
+  document.getElementById('login-form').hidden = false;
+  document.getElementById('show-signup-wrap').hidden = false;
+});
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const statusEl = document.getElementById('login-status');
+  statusEl.textContent = '';
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+
+  const res = await fetch('/api/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) { statusEl.textContent = data.error; return; }
+  boot();
+});
+
+document.getElementById('signup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const statusEl = document.getElementById('signup-status');
+  statusEl.textContent = '';
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+
+  const res = await fetch('/api/auth/signup', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) { statusEl.textContent = data.error; return; }
+  boot();
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  currentUser = null;
+  boot();
+});
+
+document.getElementById('connect-ebay-btn').addEventListener('click', () => {
+  window.location.href = '/api/ebay/connect';
+});
+
+document.getElementById('settings-btn').addEventListener('click', openEbaySettingsModal);
+
+// Builds a <select>'s options from eBay's real list of an item type (locations or one policy
+// type). If the currently-saved value isn't in that list (stale ID, or eBay-side deletion), it's
+// kept as a separate labeled option instead of silently dropped, so Save doesn't clobber it.
+function buildPickerOptions(items, idKey, labelKey, currentValue) {
+  const known = items.some((item) => item[idKey] === currentValue);
+  const opts = items.map((item) =>
+    `<option value="${escapeAttr(item[idKey])}" ${item[idKey] === currentValue ? 'selected' : ''}>${escapeAttr(item[labelKey])}</option>`
+  );
+  if (currentValue && !known) {
+    opts.unshift(`<option value="${escapeAttr(currentValue)}" selected>Current: ${escapeAttr(currentValue)}</option>`);
+  }
+  return `<option value="">Select...</option>${opts.join('')}`;
+}
+
+async function openEbaySettingsModal() {
+  const backdrop = openModal(`
+    <h3 class="reveal-on-load">eBay Settings</h3>
+    <p class="muted">Loading your eBay locations and business policies&hellip;</p>
+  `);
+  revealNow(backdrop.querySelector('h3'));
+
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
+
+  const [settings, locationsRes, policiesRes] = await Promise.all([
+    fetch('/api/ebay/settings').then((r) => r.json()),
+    fetch('/api/ebay/locations'),
+    fetch('/api/ebay/policies'),
+  ]);
+
+  const locations = locationsRes.ok ? await locationsRes.json() : [];
+  const locationsError = locationsRes.ok ? null : await describeError(locationsRes);
+
+  const policiesData = await policiesRes.json().catch(() => ({}));
+  const policiesOk = policiesRes.ok;
+  const needsReconnect = !policiesOk && policiesData.needsReconnect;
+  const policies = policiesOk ? policiesData : { fulfillment: [], payment: [], return: [] };
+
+  const panel = backdrop.querySelector('.modal-panel');
+  panel.innerHTML = `
+    <h3 class="reveal-on-load">eBay Settings</h3>
+    <p class="muted">Picked live from your own eBay Seller Hub account.</p>
+    <form id="ebay-settings-form">
+      <label>Ship-From Location
+        <select name="merchantLocationKey" ${locationsError ? 'disabled' : ''}>
+          ${buildPickerOptions(locations, 'key', 'label', settings.merchantLocationKey)}
+        </select>
+      </label>
+      ${locationsError ? `<p class="error">Couldn't load locations: ${escapeAttr(locationsError)}</p>` : ''}
+
+      ${needsReconnect ? `
+        <p class="error">Business policies need one more eBay permission this connection doesn't have yet.</p>
+        <button type="button" class="secondary" data-action="reconnect">Reconnect eBay Account</button>
+      ` : `
+        <label>Fulfillment (Shipping) Policy
+          <select name="fulfillmentPolicyId" ${!policiesOk ? 'disabled' : ''}>
+            ${buildPickerOptions(policies.fulfillment, 'id', 'label', settings.fulfillmentPolicyId)}
+          </select>
+        </label>
+        <label>Payment Policy
+          <select name="paymentPolicyId" ${!policiesOk ? 'disabled' : ''}>
+            ${buildPickerOptions(policies.payment, 'id', 'label', settings.paymentPolicyId)}
+          </select>
+        </label>
+        <label>Return Policy
+          <select name="returnPolicyId" ${!policiesOk ? 'disabled' : ''}>
+            ${buildPickerOptions(policies.return, 'id', 'label', settings.returnPolicyId)}
+          </select>
+        </label>
+        ${!policiesOk ? `<p class="error">Couldn't load policies: ${escapeAttr(policiesData.error || 'unknown error')}</p>` : ''}
+      `}
+
+      <div id="ebay-settings-status" aria-live="polite"></div>
+      <div class="modal-actions">
+        <button type="button" class="danger" data-action="disconnect">Disconnect eBay</button>
+        <button type="button" class="secondary" data-action="close">Close</button>
+        <button type="submit" ${needsReconnect ? 'disabled' : ''}>Save</button>
+      </div>
+    </form>
+  `;
+  revealNow(panel.querySelector('h3'));
+
+  const form = backdrop.querySelector('#ebay-settings-form');
+  const statusEl = backdrop.querySelector('#ebay-settings-status');
+
+  backdrop.querySelector('[data-action="close"]').addEventListener('click', () => closeModal(backdrop));
+
+  backdrop.querySelector('[data-action="disconnect"]').addEventListener('click', async () => {
+    if (!confirm('Disconnect your eBay account? You will need to reconnect before publishing again.')) return;
+    await fetch('/api/ebay/disconnect', { method: 'POST' });
+    closeModal(backdrop);
+    boot();
+  });
+
+  const reconnectBtn = backdrop.querySelector('[data-action="reconnect"]');
+  if (reconnectBtn) {
+    reconnectBtn.addEventListener('click', () => { window.location.href = '/api/ebay/connect'; });
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = {
+      merchantLocationKey: form.merchantLocationKey.value,
+      fulfillmentPolicyId: form.fulfillmentPolicyId ? form.fulfillmentPolicyId.value : settings.fulfillmentPolicyId,
+      paymentPolicyId: form.paymentPolicyId ? form.paymentPolicyId.value : settings.paymentPolicyId,
+      returnPolicyId: form.returnPolicyId ? form.returnPolicyId.value : settings.returnPolicyId,
+    };
+    const res = await fetch('/api/ebay/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) { statusEl.textContent = data.error; statusEl.className = 'error'; return; }
+    closeModal(backdrop);
+    boot();
+  });
+}
+
+boot();
 initShipMarks();
 initButtonMagnet();
 initCardSpotlight();

@@ -22,9 +22,10 @@ const CONTENT_TYPES = {
 
 // eBay's Inventory API fetches listing photos itself from a public HTTPS URL - it can never
 // reach localhost - so each photo is uploaded to R2 here and eBay is given the resulting
-// public URL instead.
-async function uploadPartPhoto(localPath) {
-  const key = `parts/${path.basename(localPath)}`;
+// public URL instead. Keys are namespaced per seller (userId) so photos from different sellers'
+// accounts in this shared bucket can never collide or be confused with each other.
+async function uploadPartPhoto(localPath, userId) {
+  const key = `parts/${userId}/${path.basename(localPath)}`;
   const body = fs.readFileSync(localPath);
   const contentType = CONTENT_TYPES[path.extname(localPath).toLowerCase()] || 'application/octet-stream';
 

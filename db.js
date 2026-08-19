@@ -2,10 +2,46 @@ const { DatabaseSync } = require('node:sqlite');
 const fs = require('fs');
 const path = require('path');
 
-const dataDir = path.join(__dirname, 'data');
+// DATA_DIR lets a deployment host's persistent disk (mounted somewhere outside this repo's own
+// directory, e.g. Render) hold the DB across deploys/restarts - defaults to a local ./data folder
+// for dev, where the repo's own filesystem is already persistent.
+const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 
 const db = new DatabaseSync(path.join(dataDir, 'app.db'));
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,           -- sha256 hash of the session token (raw token only ever lives in the cookie)
+    user_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    expires_at TEXT NOT NULL
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ebay_connections (
+    user_id INTEGER PRIMARY KEY,
+    refresh_token_encrypted TEXT NOT NULL,
+    refresh_token_expires_at TEXT,
+    scopes TEXT,
+    merchant_location_key TEXT,
+    fulfillment_policy_id TEXT,
+    payment_policy_id TEXT,
+    return_policy_id TEXT,
+    connected_at TEXT,
+    updated_at TEXT
+  );
+`);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS parts (
@@ -68,6 +104,11 @@ if (!columns.includes('ai_free_shipping')) {
   db.exec('ALTER TABLE parts ADD COLUMN ai_length_in REAL');
   db.exec('ALTER TABLE parts ADD COLUMN ai_width_in REAL');
   db.exec('ALTER TABLE parts ADD COLUMN ai_height_in REAL');
+}
+if (!columns.includes('user_id')) {
+  // Nullable: pre-existing rows from before multi-tenant accounts are backfilled to the
+  // first-ever signed-up user (see routes/auth.js signup handler), not assigned here.
+  db.exec('ALTER TABLE parts ADD COLUMN user_id INTEGER');
 }
 
 module.exports = db;

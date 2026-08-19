@@ -1,22 +1,25 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
 const fs = require('fs');
 const db = require('../db');
-const { generateListing } = require('../services/claudeService');
+const { generateListing } = require('../services/aiService');
 const { publishListing, suggestCategories, getValidConditions } = require('../services/ebayService');
+const { getUserEbayCreds } = require('../services/ebayAccountService');
+const { requireAuth } = require('../middleware/auth');
+const { UPLOAD_DIR, safeUploadFilename, isAllowedImageMimetype } = require('../services/uploadService');
 
 const router = express.Router();
-
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 
 const upload = multer({
   storage: multer.diskStorage({
     destination: UPLOAD_DIR,
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`),
+    filename: (req, file, cb) => cb(null, safeUploadFilename(file.originalname)),
   }),
   limits: { fileSize: 10 * 1024 * 1024, files: 12 }, // 10MB per file, up to 12 photos (eBay's per-listing limit)
+  fileFilter: (req, file, cb) => cb(null, isAllowedImageMimetype(file.mimetype)),
 });
+
+router.use(requireAuth);
 
 // --- Create a new draft from photo(s) and/or notes ---
 router.post('/', upload.array('photos', 12), async (req, res) => {
@@ -48,14 +51,15 @@ router.post('/', upload.array('photos', 12), async (req, res) => {
 
     const stmt = db.prepare(`
       INSERT INTO parts (
-        photo_paths_json, raw_input, ai_part_number, ai_brand, ai_title, ai_description,
+        user_id, photo_paths_json, raw_input, ai_part_number, ai_brand, ai_title, ai_description,
         ai_price_low, ai_price_high, ai_specifics_json, ai_confidence, ai_condition,
         ai_category_id, ai_category_name, ai_weight_lb, ai_length_in, ai_width_in, ai_height_in,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
     `);
 
     const info = stmt.run(
+      req.user.id,
       JSON.stringify(imagePaths),
       rawInput,
       ai.part_number,
@@ -86,19 +90,22 @@ router.post('/', upload.array('photos', 12), async (req, res) => {
 
 // --- List all drafts ---
 router.get('/', (req, res) => {
-  const parts = db.prepare('SELECT * FROM parts ORDER BY created_at DESC').all();
+  const parts = db.prepare('SELECT * FROM parts WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
   res.json(parts);
 });
 
 // --- Get one ---
 router.get('/:id', (req, res) => {
-  const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  const part = db.prepare('SELECT * FROM parts WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!part) return res.status(404).json({ error: 'Not found' });
   res.json(part);
 });
 
 // --- Edit a draft before publishing (seller review step) ---
 router.put('/:id', (req, res) => {
+  const owned = db.prepare('SELECT id FROM parts WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!owned) return res.status(404).json({ error: 'Not found' });
+
   const fields = [
     'ai_title', 'ai_description', 'ai_price_low', 'ai_price_high', 'ai_specifics_json',
     'ai_condition', 'ai_category_id', 'ai_category_name', 'ai_quantity', 'ai_free_shipping',
@@ -116,9 +123,9 @@ router.put('/:id', (req, res) => {
   if (updates.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
 
   updates.push("updated_at = CURRENT_TIMESTAMP", "status = 'reviewed'");
-  values.push(req.params.id);
+  values.push(req.params.id, req.user.id);
 
-  db.prepare(`UPDATE parts SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  db.prepare(`UPDATE parts SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...values);
   const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
   res.json(part);
 });
@@ -151,7 +158,7 @@ router.get('/categories/:categoryId/conditions', async (req, res) => {
 
 // --- Add more photos to an existing draft ---
 router.post('/:id/photos', upload.array('photos', 12), async (req, res) => {
-  const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  const part = db.prepare('SELECT * FROM parts WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!part) return res.status(404).json({ error: 'Not found' });
 
   const existing = JSON.parse(part.photo_paths_json || '[]');
@@ -167,7 +174,7 @@ router.post('/:id/photos', upload.array('photos', 12), async (req, res) => {
 
 // --- Remove one photo from a draft by index ---
 router.delete('/:id/photos/:index', (req, res) => {
-  const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  const part = db.prepare('SELECT * FROM parts WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!part) return res.status(404).json({ error: 'Not found' });
 
   const paths = JSON.parse(part.photo_paths_json || '[]');
@@ -193,11 +200,12 @@ router.delete('/:id/photos/:index', (req, res) => {
 // in this dashboard - there is no intermediate "unpublished draft on eBay" step anymore,
 // since eBay's own UI doesn't surface that state anywhere useful.
 router.post('/:id/publish', async (req, res) => {
-  const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  const part = db.prepare('SELECT * FROM parts WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!part) return res.status(404).json({ error: 'Not found' });
 
   try {
-    const result = await publishListing(part);
+    const ebayCreds = getUserEbayCreds(req.user.id);
+    const result = await publishListing(part, ebayCreds);
 
     db.prepare(`
       UPDATE parts SET status = 'published', ebay_sku = ?, ebay_offer_id = ?, ebay_listing_id = ?,
@@ -227,7 +235,7 @@ router.post('/:id/publish', async (req, res) => {
 // --- Delete a draft entirely (local dashboard record only - does NOT end a live eBay listing
 //     if this draft was already published; the frontend confirmation makes that distinction) ---
 router.delete('/:id', (req, res) => {
-  const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(req.params.id);
+  const part = db.prepare('SELECT * FROM parts WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!part) return res.status(404).json({ error: 'Not found' });
 
   const paths = JSON.parse(part.photo_paths_json || '[]');
