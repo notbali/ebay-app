@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Privacy Policy for The Bali Bay — what data we collect, how it's used, and who we share it with." />
+<title>Privacy Policy — The Bali Bay</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body class="legal-page">
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div class="wordmark">
+        <span class="kicker">THE</span>
+        <h1><a href="/" style="color: inherit; text-decoration: none;">Bali Bay</a></h1>
+      </div>
+      <p>Privacy Policy</p>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Privacy Policy</h2>
+      <p class="effective-date">Effective date: August 27, 2026</p>
+
+      <p>The Bali Bay ("we," "us," "our") provides an AI-assisted tool that helps independent eBay sellers draft and publish listings. This Privacy Policy explains what information we collect through the service (the "Service"), how we use it, and who we share it with.</p>
+
+      <h3>1. Information We Collect</h3>
+      <ul>
+        <li><strong>Account information:</strong> your email address and a securely hashed password. We never store or see your password in plain text.</li>
+        <li><strong>Session data:</strong> a signed, HttpOnly session cookie used only to keep you signed in. We don't use tracking or advertising cookies.</li>
+        <li><strong>eBay connection data:</strong> when you connect your eBay seller account through eBay's own OAuth authorization flow, we store an encrypted eBay refresh token (encrypted at rest), the permission scopes you granted, and the eBay business policy identifiers (shipping, payment, returns, warehouse location) you choose to link. We never see or store your eBay password.</li>
+        <li><strong>Listing content:</strong> the photos and notes you upload about an item, and the AI-drafted title, description, price range, condition, category, and item specifics generated from them.</li>
+        <li><strong>Technical data:</strong> your IP address, used only to enforce login and signup rate limits so accounts can't be brute-forced. It isn't stored long-term or linked to your account for any other purpose.</li>
+      </ul>
+
+      <h3>2. How We Use Information</h3>
+      <ul>
+        <li>To create and secure your account (authentication and session management).</li>
+        <li>To generate draft listings, by sending your photos and notes to an AI provider (see below).</li>
+        <li>To publish listings to eBay through your own authorized eBay connection, only when you explicitly ask us to.</li>
+        <li>To prevent abuse, such as repeated failed login or signup attempts.</li>
+      </ul>
+      <p>We do not use your data for advertising, and we do not sell your personal information to anyone.</p>
+
+      <h3>3. Third-Party Service Providers</h3>
+      <p>We rely on the following providers to operate the Service. Each receives only the data needed to do its job:</p>
+      <ul>
+        <li><strong>eBay Inc.</strong> — receives listing content (photos, titles, descriptions, pricing, specifics) and acts on your behalf strictly within the permissions you granted, to create, update, and publish listings on your own eBay seller account.</li>
+        <li><strong>AI providers</strong> (currently an NVIDIA-hosted model, with Anthropic's Claude as a fallback option) — receive the photos and notes you upload, in order to identify the item and draft listing content.</li>
+        <li><strong>Cloudflare</strong> (R2 object storage) — hosts your uploaded listing photos at a public URL, which eBay's own systems require in order to fetch images directly.</li>
+        <li><strong>Our hosting provider</strong> — runs the application and database on a persistent server.</li>
+      </ul>
+      <p>We do not share your information with any other third party, and we do not sell your personal data.</p>
+
+      <h3>4. Data Storage &amp; Security</h3>
+      <ul>
+        <li>Passwords are hashed with a per-account random salt — never stored or logged in plain text.</li>
+        <li>Session identifiers are hashed before storage; the session cookie is HttpOnly and, in production, marked Secure, so it's never readable by page scripts.</li>
+        <li>Your eBay refresh token is encrypted at rest using a key kept separate from the database.</li>
+      </ul>
+      <p>No method of storage or transmission is perfectly secure, and we can't guarantee absolute security — but we apply reasonable, industry-standard safeguards appropriate to a service of this size.</p>
+
+      <h3>5. Data Retention</h3>
+      <p>We keep your account, listing, and eBay connection data for as long as your account stays active. You can request deletion of your account and associated data at any time (see Contact below), and we'll delete or anonymize it within a reasonable time, except where we're required to keep records by law.</p>
+
+      <h3>6. Your Rights &amp; Choices</h3>
+      <p>You can ask us to access, correct, export, or delete your personal data, or to disconnect your eBay account, at any time by emailing us. You can also disconnect your own eBay account yourself, at any time, from the app's Settings menu — that immediately stops any future access to your eBay account.</p>
+
+      <h3>7. Cookies</h3>
+      <p>We use a single strictly-necessary session cookie to keep you signed in. We don't use analytics, advertising, or third-party tracking cookies.</p>
+
+      <h3>8. Children's Privacy</h3>
+      <p>The Service is intended for business use by adult sellers and isn't directed at children under 16. We don't knowingly collect personal information from children.</p>
+
+      <h3>9. Changes to This Policy</h3>
+      <p>We may update this Privacy Policy from time to time. We'll update the effective date above when we do. Continuing to use the Service after a change means you accept the updated policy.</p>
+
+      <h3>10. Contact Us</h3>
+      <p>Questions about this Privacy Policy or your data? Email <a href="mailto:murtayabali@gmail.com">murtayabali@gmail.com</a>.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a href="/">Back to The Bali Bay</a>
+    <a href="/terms.html">Terms of Service</a>
+  </footer>
+</body>
+</html>
