@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { UPLOAD_DIR, ownsUploadedFile } = require('../services/uploadService');
+const { UPLOAD_DIR, ownsUploadedFile, sniffImageFile } = require('../services/uploadService');
 
 const router = express.Router();
 
@@ -19,7 +19,18 @@ router.get('/:filename', requireAuth, (req, res) => {
 
   if (!ownsUploadedFile(rows, filename)) return res.status(404).end();
 
-  res.sendFile(path.join(UPLOAD_DIR, filename));
+  // Ignore the on-disk extension for the response's Content-Type - it comes from the client's
+  // original filename (see safeUploadFilename), which is not trustworthy. sendFile would
+  // otherwise derive Content-Type from that extension (e.g. serving a smuggled photo.html as
+  // text/html), which combined with a browser rendering it could execute embedded script under
+  // this app's origin. Sniffing the real file signature and forcing that as the Content-Type -
+  // res.type() sets a header sendFile then leaves alone - closes that off regardless of name.
+  const filePath = path.join(UPLOAD_DIR, filename);
+  const verifiedType = sniffImageFile(filePath);
+  if (!verifiedType) return res.status(404).end();
+
+  res.type(verifiedType);
+  res.sendFile(filePath);
 });
 
 module.exports = router;
