@@ -1054,25 +1054,6 @@ function initHeadingReveal() {
   els.forEach((el) => observer.observe(el));
 }
 
-// Speeds up the header ship's CSS travel animation on hover/focus via the Web Animations API's
-// playbackRate, which scales the running animation's existing timeline in place - unlike
-// changing animation-duration (which recalculates position as elapsed-time / duration and jumps
-// to a different point in the cycle), this keeps the ship exactly where it is and just makes it
-// advance faster or slower from there, so it visibly accelerates rather than snapping.
-function initBrandShipSpeed() {
-  const wordmark = document.querySelector('.wordmark');
-  const shipTravel = document.querySelector('.brand-ship-travel');
-  if (!wordmark || !shipTravel || !shipTravel.getAnimations) return;
-
-  const setSpeed = (rate) => {
-    shipTravel.getAnimations().forEach((anim) => { anim.playbackRate = rate; });
-  };
-  wordmark.addEventListener('pointerenter', () => setSpeed(3.5));
-  wordmark.addEventListener('pointerleave', () => setSpeed(1));
-  wordmark.addEventListener('focusin', () => setSpeed(3.5));
-  wordmark.addEventListener('focusout', () => setSpeed(1));
-}
-
 // ============================================================
 // Account: login/signup, eBay connect gate, settings, logout
 // ============================================================
@@ -1328,4 +1309,3 @@ initShipMarks();
 initButtonMagnet();
 initCardSpotlight();
 initHeadingReveal();
-initBrandShipSpeed();
