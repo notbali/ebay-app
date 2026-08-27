@@ -6,7 +6,7 @@ const { generateListing } = require('../services/aiService');
 const { publishListing, suggestCategories, getValidConditions } = require('../services/ebayService');
 const { getUserEbayCreds } = require('../services/ebayAccountService');
 const { requireAuth } = require('../middleware/auth');
-const { UPLOAD_DIR, safeUploadFilename, isAllowedImageMimetype } = require('../services/uploadService');
+const { UPLOAD_DIR, safeUploadFilename, isAllowedImageMimetype, sniffImageFile } = require('../services/uploadService');
 
 const router = express.Router();
 
@@ -16,13 +16,31 @@ const upload = multer({
     filename: (req, file, cb) => cb(null, safeUploadFilename(file.originalname)),
   }),
   limits: { fileSize: 10 * 1024 * 1024, files: 12 }, // 10MB per file, up to 12 photos (eBay's per-listing limit)
+  // Cheap first-pass rejection only - file.mimetype is the client-declared multipart
+  // Content-Type, trivially spoofed. verifyUploadedImages below does the real check against
+  // the bytes multer actually wrote to disk.
   fileFilter: (req, file, cb) => cb(null, isAllowedImageMimetype(file.mimetype)),
 });
+
+// Runs after multer has written req.files to disk. file.mimetype can't be trusted (see above),
+// so this re-checks each file's real signature and deletes+rejects the whole request if any file
+// isn't actually one of the allowed image types - closes the gap where a non-image file (e.g.
+// named photo.html, containing a <script>) could be smuggled in behind a spoofed Content-Type.
+function verifyUploadedImages(req, res, next) {
+  const files = req.files || [];
+  for (const file of files) {
+    if (!sniffImageFile(file.path)) {
+      for (const f of files) fs.unlink(f.path, () => {});
+      return res.status(400).json({ error: `File "${file.originalname}" is not a valid image` });
+    }
+  }
+  next();
+}
 
 router.use(requireAuth);
 
 // --- Create a new draft from photo(s) and/or notes ---
-router.post('/', upload.array('photos', 12), async (req, res) => {
+router.post('/', upload.array('photos', 12), verifyUploadedImages, async (req, res) => {
   // If the client cancels (e.g. the dashboard's Cancel button aborts the fetch), stop the
   // in-flight Claude call and skip saving a draft the seller explicitly walked away from -
   // otherwise it would silently appear moments later despite "Voyage cancelled" being shown.
@@ -157,7 +175,7 @@ router.get('/categories/:categoryId/conditions', async (req, res) => {
 });
 
 // --- Add more photos to an existing draft ---
-router.post('/:id/photos', upload.array('photos', 12), async (req, res) => {
+router.post('/:id/photos', upload.array('photos', 12), verifyUploadedImages, async (req, res) => {
   const part = db.prepare('SELECT * FROM parts WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!part) return res.status(404).json({ error: 'Not found' });
 
