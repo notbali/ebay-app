@@ -95,6 +95,21 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function isAdminEmail(email) {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  return !!adminEmail && !!email && email.toLowerCase() === adminEmail.toLowerCase();
+}
+
+// Must run after requireAuth (needs req.user already set). There's a single admin - the account
+// matching ADMIN_EMAIL - rather than a roles table, since only the app's owner authors "What's
+// New" posts or reads submitted feedback.
+function requireAdmin(req, res, next) {
+  if (!req.user || !isAdminEmail(req.user.email)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 module.exports = {
   COOKIE_NAME,
   parseCookies,
@@ -104,5 +119,7 @@ module.exports = {
   destroySessionByToken,
   getSessionUser,
   requireAuth,
+  requireAdmin,
+  isAdminEmail,
   pruneExpiredSessions,
 };

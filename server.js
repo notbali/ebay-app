@@ -5,6 +5,8 @@ const partsRouter = require('./routes/parts');
 const authRouter = require('./routes/auth');
 const ebayAuthRouter = require('./routes/ebayAuth');
 const uploadsRouter = require('./routes/uploads');
+const updatesRouter = require('./routes/updates');
+const feedbackRouter = require('./routes/feedback');
 const { securityHeaders } = require('./middleware/securityHeaders');
 const { pruneExpiredSessions } = require('./middleware/auth');
 
@@ -22,6 +24,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth', authRouter);
 app.use('/api/ebay', ebayAuthRouter);
 app.use('/api/parts', partsRouter);
+app.use('/api/updates', updatesRouter);
+app.use('/api/feedback', feedbackRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

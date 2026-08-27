@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { hashPassword, verifyPassword, createSessionToken, verifyCookieValue } = require('../services/authService');
 const {
-  parseCookies, setSessionCookie, clearSessionCookie, createSession, destroySessionByToken, getSessionUser, COOKIE_NAME,
+  parseCookies, setSessionCookie, clearSessionCookie, createSession, destroySessionByToken, getSessionUser, COOKIE_NAME, isAdminEmail,
 } = require('../middleware/auth');
 const { checkRateLimit, resetRateLimit } = require('../services/rateLimitService');
 
@@ -83,7 +83,7 @@ router.post('/logout', (req, res) => {
 // Always 200 (never 401) - the frontend uses this as a plain status check on load.
 router.get('/me', (req, res) => {
   const user = getSessionUser(req);
-  res.json({ user });
+  res.json({ user: user ? { ...user, isAdmin: isAdminEmail(user.email) } : null });
 });
 
 module.exports = router;

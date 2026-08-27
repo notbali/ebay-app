@@ -1119,6 +1119,140 @@ document.getElementById('connect-ebay-btn').addEventListener('click', () => {
 });
 
 document.getElementById('settings-btn').addEventListener('click', openEbaySettingsModal);
+document.getElementById('updates-btn').addEventListener('click', openUpdatesModal);
+document.getElementById('feedback-btn').addEventListener('click', openFeedbackModal);
+
+// ============================================================
+// What's New — read-only changelog for everyone, plus a post/delete
+// form shown only to the admin account (server-enforced; the isAdmin
+// flag here just decides whether to bother rendering the form).
+// ============================================================
+async function openUpdatesModal() {
+  const backdrop = openModal(`<h3 class="reveal-on-load">What's New</h3><p class="muted">Loading&hellip;</p>`);
+  revealNow(backdrop.querySelector('h3'));
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
+
+  const res = await fetch('/api/updates');
+  renderUpdatesPanel(backdrop.querySelector('.modal-panel'), res.ok ? await res.json() : []);
+}
+
+async function refreshUpdatesPanel(panel) {
+  const res = await fetch('/api/updates');
+  renderUpdatesPanel(panel, res.ok ? await res.json() : []);
+}
+
+function renderUpdatesPanel(panel, updates) {
+  const isAdmin = !!(currentUser && currentUser.isAdmin);
+
+  panel.innerHTML = `
+    <h3 class="reveal-on-load">What's New</h3>
+    <div class="updates-list">
+      ${updates.length === 0 ? '<p class="muted">Nothing posted yet.</p>' : updates.map((u) => `
+        <div class="update-item">
+          <div class="update-item-head">
+            <strong>${escapeAttr(u.title)}</strong>
+            <span class="muted">${new Date(u.created_at).toLocaleDateString()}</span>
+            ${isAdmin ? `<button type="button" class="danger small" data-action="delete-update" data-id="${u.id}">Delete</button>` : ''}
+          </div>
+          <p>${escapeAttr(u.body)}</p>
+        </div>
+      `).join('')}
+    </div>
+    ${isAdmin ? `
+      <form id="new-update-form">
+        <label>Title<input type="text" name="title" required /></label>
+        <label>Details<textarea name="body" rows="3" required></textarea></label>
+        <button type="submit">Post update</button>
+        <div id="new-update-status" class="error" aria-live="polite"></div>
+      </form>
+    ` : ''}
+    <div class="modal-actions">
+      <button type="button" class="secondary" data-action="close">Close</button>
+    </div>
+  `;
+  revealNow(panel.querySelector('h3'));
+
+  panel.querySelector('[data-action="close"]').addEventListener('click', () => closeModal(panel.closest('.modal-backdrop')));
+
+  panel.querySelectorAll('[data-action="delete-update"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      await fetch(`/api/updates/${btn.dataset.id}`, { method: 'DELETE' });
+      refreshUpdatesPanel(panel);
+    });
+  });
+
+  const form = panel.querySelector('#new-update-form');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusEl = form.querySelector('#new-update-status');
+      statusEl.textContent = '';
+      const res = await fetch('/api/updates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: form.title.value, body: form.body.value }),
+      });
+      const data = await res.json();
+      if (!res.ok) { statusEl.textContent = data.error; return; }
+      refreshUpdatesPanel(panel);
+    });
+  }
+}
+
+// ============================================================
+// Feedback — free-text message from a signed-in seller, emailed to
+// the admin (see routes/feedback.js) and kept in the DB either way.
+// ============================================================
+function openFeedbackModal() {
+  const backdrop = openModal(`
+    <h3 class="reveal-on-load">Send Feedback</h3>
+    <p class="muted">Tell us what's working, what's not, or what you'd like to see. This goes straight to the team.</p>
+    <form id="feedback-form">
+      <label>Message<textarea name="message" rows="5" required maxlength="5000"></textarea></label>
+      <div id="feedback-status" class="error" aria-live="polite"></div>
+      <div class="modal-actions">
+        <button type="button" class="secondary" data-action="close">Cancel</button>
+        <button type="submit">Send</button>
+      </div>
+    </form>
+  `);
+  revealNow(backdrop.querySelector('h3'));
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
+  backdrop.querySelector('[data-action="close"]').addEventListener('click', () => closeModal(backdrop));
+
+  const form = backdrop.querySelector('#feedback-form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const statusEl = form.querySelector('#feedback-status');
+    statusEl.textContent = '';
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: form.message.value }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send feedback');
+
+      const panel = backdrop.querySelector('.modal-panel');
+      panel.innerHTML = `
+        <div class="modal-success-icon">&#10003;</div>
+        <h3 class="reveal-on-load">Thanks!</h3>
+        <p class="muted">Your feedback has been sent.</p>
+        <div class="modal-actions"><button type="button" data-action="done">Done</button></div>
+      `;
+      revealNow(panel.querySelector('h3'));
+      panel.querySelector('[data-action="done"]').addEventListener('click', () => closeModal(backdrop));
+    } catch (err) {
+      statusEl.textContent = err.message;
+      submitBtn.disabled = false;
+    }
+  });
+}
 
 // Builds a <select>'s options from eBay's real list of an item type (locations or one policy
 // type). If the currently-saved value isn't in that list (stale ID, or eBay-side deletion), it's

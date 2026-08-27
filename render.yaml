@@ -39,6 +39,13 @@ services:
       - key: PUBLIC_BASE_URL
         sync: false
 
+      # What's New / Feedback: ADMIN_EMAIL gates posting updates and reading feedback to one
+      # account; RESEND_API_KEY emails feedback there too (feedback is saved to the DB either way).
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+
       # AI provider
       - key: AI_PROVIDER
         value: kimi

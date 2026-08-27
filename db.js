@@ -73,6 +73,26 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS updates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    author_user_id INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    email_sent INTEGER DEFAULT 0, -- best-effort record of whether the notification email went out; the row is the durable copy either way
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
 // Migrations for DBs created before these columns existed.
 const columns = db.prepare("PRAGMA table_info(parts)").all().map((c) => c.name);
 if (!columns.includes('ai_condition')) {

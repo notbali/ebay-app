@@ -590,6 +590,13 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 .modal-panel .modal-success-icon { background: var(--current); color: var(--abyss); }
 .modal-panel .modal-error-icon { background: var(--danger-deep); }
 
+.updates-list { display: flex; flex-direction: column; gap: 1rem; max-height: 45vh; overflow-y: auto; margin-bottom: 1rem; }
+.update-item { border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; }
+.update-item-head { display: flex; align-items: center; gap: 0.6rem; }
+.update-item-head strong { flex: 1; }
+.update-item p { margin: 0.35rem 0 0; color: var(--text-body); white-space: pre-wrap; }
+.danger.small { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+
 /* ============================================================
    Footer
    ============================================================ */
