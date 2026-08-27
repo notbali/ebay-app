@@ -3,15 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="The Bali Bay — an industrial parts listing assistant. AI drafts your eBay listing, you review it, then it ships across the bay to eBay." />
-<title>The Bali Bay — Listing Voyage</title>
+<meta name="description" content="The Bali Bay — an AI listing assistant for industrial parts sellers on eBay. Upload a photo, get a drafted listing, review every word, then publish on your own terms." />
+<title>The Bali Bay — AI Listing Assistant for Industrial Parts Sellers</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;900&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="landing.css" />
 </head>
-<body>
+<body class="landing-body">
   <div class="water-bg" aria-hidden="true">
     <svg viewBox="0 0 800 400" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
       <g stroke="#6E92BA" stroke-width="1" fill="none">
@@ -22,8 +23,9 @@
       </g>
     </svg>
   </div>
-  <header class="site-header">
-    <div class="site-header-inner">
+
+  <header class="site-header landing-header">
+    <div class="site-header-inner landing-header-inner">
       <div class="wordmark">
         <span class="kicker">THE</span>
         <h1 class="reveal-on-load">Bali Bay</h1>
@@ -39,77 +41,82 @@
           </g>
         </svg>
       </div>
-      <p>Upload a part, AI charts the listing, you review it, then it sails to eBay.</p>
-      <div class="account-bar" id="account-bar" hidden>
-        <span class="badge" id="ebay-status-badge">Not connected</span>
-        <button type="button" class="secondary" id="updates-btn">What's New</button>
-        <button type="button" class="secondary" id="settings-btn">Settings</button>
-        <button type="button" class="secondary" id="logout-btn">Logout</button>
-      </div>
+      <nav class="landing-nav">
+        <a href="/app.html" class="landing-nav-link">Log In</a>
+        <a href="/app.html" class="landing-nav-cta">Get Started</a>
+      </nav>
     </div>
   </header>
 
-  <main>
-    <section id="auth-section" class="auth-section" hidden>
-      <h2 class="reveal-on-load">Come Aboard<span class="subhead">Sign in or create an account to start listing</span></h2>
-      <div class="upload-panel">
-        <form id="login-form">
-          <label>Email<input type="email" id="login-email" required autocomplete="email" /></label>
-          <label>Password<input type="password" id="login-password" required autocomplete="current-password" /></label>
-          <button type="submit">Log In</button>
-          <div id="login-status" class="error" aria-live="polite"></div>
-        </form>
-        <p class="muted" id="show-signup-wrap">New here? <a href="#" id="show-signup">Create an account</a></p>
-
-        <form id="signup-form" hidden>
-          <label>Email<input type="email" id="signup-email" required autocomplete="email" /></label>
-          <label>Password (min 8 characters)<input type="password" id="signup-password" required minlength="8" autocomplete="new-password" /></label>
-          <button type="submit">Create Account</button>
-          <p class="muted">By creating an account, you agree to our <a href="/terms.html">Terms of Service</a> and <a href="/privacy.html">Privacy Policy</a>.</p>
-          <div id="signup-status" class="error" aria-live="polite"></div>
-        </form>
-        <p class="muted" id="show-login-wrap" hidden>Already have an account? <a href="#" id="show-login">Log in</a></p>
-      </div>
-    </section>
-
-    <section id="connect-gate-section" class="connect-gate" hidden>
-      <h2 class="reveal-on-load">Connect Your eBay Account<span class="subhead">Authorize The Bali Bay to list on your behalf</span></h2>
-      <div class="upload-panel">
-        <p>Before you can chart a voyage, connect your own eBay seller account. Everything you publish goes live under <strong>your</strong> eBay account, not ours.</p>
-        <div id="connect-gate-status" aria-live="polite"></div>
-        <button type="button" id="connect-ebay-btn">Connect eBay Account</button>
-      </div>
-    </section>
-
-    <div id="dashboard" hidden>
-      <section id="upload-section">
-        <h2 class="reveal-on-load">Prepare Cargo<span class="subhead">Photos and notes in, a drafted listing out</span></h2>
-        <div class="upload-panel" id="upload-panel">
-          <form id="upload-form">
-            <label>
-              Photos (up to 12)
-              <div id="photo-dropzone" class="dropzone" role="button" tabindex="0" aria-label="Add photos">
-                <p>Drag &amp; drop photos here, or click to browse</p>
-                <input type="file" id="photo-input" name="photos" accept="image/*" multiple hidden />
-              </div>
-              <div id="photo-preview" class="photo-preview"></div>
-            </label>
-            <label>
-              Notes / part number / spec sheet text (optional but helps accuracy)
-              <textarea id="notes-input" name="notes" rows="4" placeholder="e.g. Omron relay, pulled from line 3, model illegible on label but 24VDC coil, 8-pin"></textarea>
-            </label>
-            <button type="submit">Chart the Voyage</button>
-          </form>
-          <div id="upload-status" aria-live="polite"></div>
+  <main class="landing-main">
+    <section class="hero">
+      <div class="hero-voyage" id="hero-voyage" aria-hidden="true"></div>
+      <div class="hero-copy">
+        <p class="hero-eyebrow">AI listing assistant for industrial parts sellers</p>
+        <h2 class="hero-title reveal-on-load">Chart the course from parts bin to eBay listing.</h2>
+        <p class="hero-sub">Upload a photo and a few notes. The Bali Bay's AI drafts the title, description, price, and specifics &mdash; you review every word before anything ships to eBay.</p>
+        <div class="hero-actions">
+          <a href="/app.html" class="hero-cta-primary">Get Started &mdash; It's Free</a>
+          <a href="/app.html" class="hero-cta-secondary">Log In</a>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section id="drafts-section">
-        <h2 class="reveal-on-load">Voyage Manifest<span class="subhead">Every listing, from port to delivered</span></h2>
-        <div id="harbor-board"></div>
-        <div id="drafts-list"></div>
-      </section>
-    </div>
+    <section class="landing-section">
+      <h2 class="reveal-on-load">How It Works<span class="subhead">Four stops, start to finish</span></h2>
+      <div class="how-it-works">
+        <div class="how-step">
+          <span class="how-step-num">1</span>
+          <h3>Prepare Cargo</h3>
+          <p>Snap photos of the part &mdash; up to twelve &mdash; and jot down anything you know: a part number, where it came from, a spec you can read off the label.</p>
+        </div>
+        <div class="how-step">
+          <span class="how-step-num">2</span>
+          <h3>Chart the Voyage</h3>
+          <p>The AI identifies the part and drafts a full listing: title, description, price, condition, and item specifics.</p>
+        </div>
+        <div class="how-step">
+          <span class="how-step-num">3</span>
+          <h3>Review the Manifest</h3>
+          <p>Every draft lands in your Voyage Manifest. Edit anything &mdash; price, wording, specifics &mdash; before it goes anywhere near eBay.</p>
+        </div>
+        <div class="how-step">
+          <span class="how-step-num">4</span>
+          <h3>Publish On Your Terms</h3>
+          <p>Push it to eBay as an unpublished draft first, then publish yourself, whenever you're ready.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-section trust-section">
+      <h2 class="reveal-on-load">Nothing Sails Without Your Say-So<span class="subhead">AI drafts, you decide</span></h2>
+      <p class="trust-lead">AI is fast at drafting, but pricing, condition, and category are judgment calls &mdash; not something to publish blind. The Bali Bay is built around one rule: nothing goes live on eBay without you explicitly saying so.</p>
+      <ul class="trust-list">
+        <li><strong>Draft-only, always.</strong> Every AI-generated listing lands as an unpublished draft. Publishing is a separate, deliberate step &mdash; yours.</li>
+        <li><strong>Your eBay account, not ours.</strong> You connect your own seller account. Everything you publish goes live under your store.</li>
+        <li><strong>Edit everything.</strong> Title, price, description, condition, specifics &mdash; all editable before a draft ever reaches eBay.</li>
+      </ul>
+    </section>
+
+    <section class="landing-section">
+      <h2 class="reveal-on-load">Built for the Parts You Actually Sell<span class="subhead">Not a generic listing tool</span></h2>
+      <p>Industrial and electrical parts don't list themselves the way a used paperback does &mdash; illegible labels, obscure part numbers, and specs that matter to the right buyer. The Bali Bay is tuned for exactly that.</p>
+      <div class="parts-pills">
+        <span class="part-pill">Relays</span>
+        <span class="part-pill">PLC Modules</span>
+        <span class="part-pill">Contactors</span>
+        <span class="part-pill">Sensors</span>
+        <span class="part-pill">Drives &amp; Motors</span>
+        <span class="part-pill">Circuit Breakers</span>
+        <span class="part-pill">Terminal Blocks</span>
+        <span class="part-pill">Pneumatic Valves</span>
+      </div>
+    </section>
+
+    <section class="landing-section final-cta">
+      <h2 class="reveal-on-load">Ready to Chart Your First Voyage?<span class="subhead">Free to start &mdash; no card required</span></h2>
+      <a href="/app.html" class="hero-cta-primary">Get Started</a>
+    </section>
   </main>
 
   <footer class="site-footer">
@@ -120,7 +127,7 @@
     <div id="feedback-widget" class="feedback-widget"></div>
   </footer>
 
-  <script src="app.js"></script>
+  <script src="landing.js"></script>
   <script src="feedback-widget.js"></script>
 </body>
 </html>
