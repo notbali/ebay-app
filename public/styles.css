@@ -608,6 +608,27 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   text-underline-offset: 2px;
 }
 .site-footer a:hover { color: var(--foam); }
+.site-footer { gap: 1.25rem; }
+
+/* ============================================================
+   Legal pages (Terms / Privacy) — plain long-form text inside the
+   existing card/section look, so they read like part of the app
+   rather than a bolted-on generic page.
+   ============================================================ */
+.legal-page section { max-width: 720px; margin-left: auto; margin-right: auto; }
+.legal-page h2 { font-size: 1.4rem; }
+.legal-page h3 {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--text-heading);
+  margin: 1.4rem 0 0.5rem;
+}
+.legal-page p, .legal-page li { line-height: 1.6; }
+.legal-page p { margin: 0 0 0.9rem; }
+.legal-page ul, .legal-page ol { margin: 0 0 0.9rem; padding-left: 1.4rem; }
+.legal-page li { margin-bottom: 0.4rem; }
+.legal-page .effective-date { color: var(--text-secondary); font-size: 0.85rem; margin: -0.5rem 0 1.5rem; }
+.legal-page strong { color: var(--text-heading); }
 
 /* ============================================================
    Responsive
