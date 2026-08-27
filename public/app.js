@@ -138,6 +138,12 @@ let selectedFiles = [];
 
 function setupDropzone(zoneEl, inputEl, onFilesAdded) {
   zoneEl.addEventListener('click', () => inputEl.click());
+  zoneEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      inputEl.click();
+    }
+  });
   zoneEl.addEventListener('dragover', (e) => {
     e.preventDefault();
     zoneEl.classList.add('dragover');
@@ -164,7 +170,7 @@ function renderSelectedFiles() {
   selectedFiles.forEach((file, i) => {
     const thumb = document.createElement('div');
     thumb.className = 'thumb';
-    thumb.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="" /><button type="button">&times;</button>`;
+    thumb.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="" /><button type="button" aria-label="Remove selected photo">&times;</button>`;
     thumb.querySelector('button').addEventListener('click', () => {
       selectedFiles.splice(i, 1);
       renderSelectedFiles();
@@ -435,7 +441,7 @@ function renderDraftCard(part) {
     ? photoPaths.map((p, i) => `
         <div class="thumb">
           <img src="/${p.replace(/^.*uploads/, 'uploads')}" alt="part photo ${i + 1}" loading="lazy" />
-          <button type="button" class="remove-photo" data-index="${i}" title="Remove photo">&times;</button>
+          <button type="button" class="remove-photo" data-index="${i}" title="Remove photo" aria-label="Remove photo ${i + 1}">&times;</button>
         </div>
       `).join('')
     : '<div class="placeholder">No photos</div>';
@@ -443,15 +449,15 @@ function renderDraftCard(part) {
   card.innerHTML = `
     <div class="card-topline">
       <span class="badge ${stageClass}"><strong>${part.ai_confidence || 'unknown'}</strong> confidence &middot; ${stageLabel}</span>
-      <button type="button" class="delete-trigger" data-action="delete-trigger" title="Delete draft" aria-haspopup="true" aria-expanded="false">
+      <button type="button" class="delete-trigger" data-action="delete-trigger" title="Delete draft" aria-label="Delete draft" aria-haspopup="true" aria-expanded="false">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
           <path d="M2 4h12M6 4V2.5A.5.5 0 0 1 6.5 2h3a.5.5 0 0 1 .5.5V4M6.5 7.5v4M9.5 7.5v4M3.5 4l.6 8.5a1 1 0 0 0 1 .9h5.8a1 1 0 0 0 1-.9L12.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
       <div class="delete-popover" data-role="delete-popover">
         <p>${isPublished || part.status === 'pushed_to_ebay'
-          ? `Delete "${escapeAttr(part.ai_title || 'this listing')}" from your dashboard? This does <strong>not</strong> end the live eBay listing - manage that in Seller Hub.`
-          : `Delete "${escapeAttr(part.ai_title || 'this draft')}"? This can't be undone.`}</p>
+          ? `Delete &ldquo;${escapeAttr(part.ai_title || 'this listing')}&rdquo; from your dashboard? This does <strong>not</strong> end the live eBay listing - manage that in Seller Hub.`
+          : `Delete &ldquo;${escapeAttr(part.ai_title || 'this draft')}&rdquo;? This can&rsquo;t be undone.`}</p>
         <div class="popover-actions">
           <button type="button" class="secondary" data-action="cancel-delete">Cancel</button>
           <button type="button" class="danger" data-action="confirm-delete">Delete</button>
@@ -460,7 +466,7 @@ function renderDraftCard(part) {
     </div>
     <div class="photo-gallery">
       ${galleryHtml}
-      <div class="dropzone dropzone-small" data-role="add-photos">
+      <div class="dropzone dropzone-small" data-role="add-photos" role="button" tabindex="0" aria-label="Add photos">
         <p>+ Add photos</p>
         <input type="file" accept="image/*" multiple hidden />
       </div>
@@ -495,7 +501,7 @@ function renderDraftCard(part) {
           Category: ${part.ai_category_name ? escapeAttr(part.ai_category_name) : 'not set - search below'}
         </div>
         <div class="category-search">
-          <input type="text" class="category-search-input" placeholder="Search eBay categories (e.g. &quot;hydraulic filter&quot;)" />
+          <input type="text" class="category-search-input" aria-label="Search eBay categories" placeholder="Search eBay categories (e.g. &quot;hydraulic filter&quot;)" />
           <button type="button" class="secondary category-search-btn">Search</button>
         </div>
         <div class="category-results"></div>
@@ -554,7 +560,7 @@ function buildSpecificsRow(key = '', value = '') {
     <div class="specifics-row" data-role="specifics-row">
       <input type="text" class="specifics-key" placeholder="Key (e.g. Brand)" value="${escapeAttr(key)}" />
       <input type="text" class="specifics-value" placeholder="Value" value="${escapeAttr(value)}" />
-      <button type="button" class="specifics-row-remove" data-action="remove-specific" title="Remove specific">&times;</button>
+      <button type="button" class="specifics-row-remove" data-action="remove-specific" title="Remove specific" aria-label="Remove specific">&times;</button>
     </div>
   `;
 }
@@ -809,13 +815,21 @@ async function addPhotos(id, files) {
   const formData = new FormData();
   files.forEach((f) => formData.append('photos', f));
   const res = await fetch(`/api/parts/${id}/photos`, { method: 'POST', body: formData });
-  if (!res.ok) alert(`Failed to add photos: ${await describeError(res)}`);
+  if (!res.ok) {
+    statusEl.textContent = `Failed to add photos: ${await describeError(res)}`;
+    statusEl.className = 'error';
+    return;
+  }
   loadDrafts();
 }
 
 async function removePhoto(id, index) {
   const res = await fetch(`/api/parts/${id}/photos/${index}`, { method: 'DELETE' });
-  if (!res.ok) alert(`Failed to remove photo: ${await describeError(res)}`);
+  if (!res.ok) {
+    statusEl.textContent = `Failed to remove photo: ${await describeError(res)}`;
+    statusEl.className = 'error';
+    return;
+  }
   loadDrafts();
 }
 
@@ -824,41 +838,69 @@ async function removePhoto(id, index) {
 // ============================================================
 const SHIPPING_STAGES = ['Preparing cargo', 'Loading vessel', 'Crossing the bay', 'Approaching eBay', 'Delivered'];
 
-function openModal(innerHtml) {
+function getFocusable(container) {
+  return Array.from(container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+    .filter((el) => !el.disabled && el.offsetParent !== null);
+}
+
+function openModal(innerHtml, ariaLabel) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
-  backdrop.innerHTML = `<div class="modal-panel" role="dialog" aria-modal="true" aria-label="Shipping status">${innerHtml}</div>`;
+  backdrop.innerHTML = `<div class="modal-panel" role="dialog" aria-modal="true" aria-label="${escapeAttr(ariaLabel || 'Dialog')}">${innerHtml}</div>`;
   document.body.appendChild(backdrop);
   const panel = backdrop.querySelector('.modal-panel');
   panel.setAttribute('tabindex', '-1');
   panel.focus();
+
+  function onKeydown(e) {
+    if (e.key === 'Escape') {
+      if (backdrop.dataset.locked === 'true') return;
+      closeModal(backdrop);
+      return;
+    }
+    if (e.key === 'Tab') {
+      const focusable = getFocusable(panel);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+  document.addEventListener('keydown', onKeydown);
+  backdrop._onKeydown = onKeydown;
+
   return backdrop;
 }
 
 function closeModal(backdrop) {
+  document.removeEventListener('keydown', backdrop._onKeydown);
   backdrop.remove();
 }
 
 async function publishToEbay(id, title) {
-  let allowBackdropClose = true;
-
   const backdrop = openModal(`
-    <h3 class="reveal-on-load">Ship "${escapeAttr(title || 'this listing')}" to eBay?</h3>
+    <h3 class="reveal-on-load">Ship &ldquo;${escapeAttr(title || 'this listing')}&rdquo; to eBay?</h3>
     <p class="muted">This makes it LIVE and visible to real buyers on eBay immediately. This cannot be undone through this app.</p>
     <div class="modal-actions">
       <button type="button" class="secondary" data-action="cancel">Cancel</button>
       <button type="button" data-action="confirm">Confirm &amp; Ship</button>
     </div>
-  `);
+  `, 'Ship listing to eBay');
   revealNow(backdrop.querySelector('h3'));
 
   backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop && allowBackdropClose) closeModal(backdrop);
+    if (e.target === backdrop && backdrop.dataset.locked !== 'true') closeModal(backdrop);
   });
   backdrop.querySelector('[data-action="cancel"]').addEventListener('click', () => closeModal(backdrop));
 
   backdrop.querySelector('[data-action="confirm"]').addEventListener('click', async () => {
-    allowBackdropClose = false; // no closing mid-publish - eBay writes aren't safely abortable
+    backdrop.dataset.locked = 'true'; // no closing mid-publish - eBay writes aren't safely abortable
     const panel = backdrop.querySelector('.modal-panel');
     panel.innerHTML = `
       <h3 class="reveal-on-load">Shipping to eBay&hellip;</h3>
@@ -881,11 +923,11 @@ async function publishToEbay(id, title) {
         throw new Error(data.error || 'Publish failed');
       }
 
-      allowBackdropClose = true;
+      backdrop.dataset.locked = 'false';
       panel.innerHTML = `
         <div class="modal-success-icon">&#10003;</div>
         <h3 class="reveal-on-load">Cargo delivered.</h3>
-        <p class="muted">"${escapeAttr(title || 'Your listing')}" is now live on eBay.</p>
+        <p class="muted">&ldquo;${escapeAttr(title || 'Your listing')}&rdquo; is now live on eBay.</p>
         <div class="modal-actions">
           ${data.listingId ? `<a class="secondary" href="https://www.ebay.com/itm/${data.listingId}" target="_blank" rel="noopener">View live listing</a>` : ''}
           <button type="button" data-action="done">Done</button>
@@ -898,7 +940,7 @@ async function publishToEbay(id, title) {
       });
     } catch (err) {
       stopCycle();
-      allowBackdropClose = true;
+      backdrop.dataset.locked = 'false';
       panel.innerHTML = `
         <div class="modal-error-icon">!</div>
         <h3 class="reveal-on-load">The voyage hit rough water.</h3>
@@ -1119,140 +1161,9 @@ document.getElementById('connect-ebay-btn').addEventListener('click', () => {
 });
 
 document.getElementById('settings-btn').addEventListener('click', openEbaySettingsModal);
-document.getElementById('updates-btn').addEventListener('click', openUpdatesModal);
-document.getElementById('feedback-btn').addEventListener('click', openFeedbackModal);
-
-// ============================================================
-// What's New — read-only changelog for everyone, plus a post/delete
-// form shown only to the admin account (server-enforced; the isAdmin
-// flag here just decides whether to bother rendering the form).
-// ============================================================
-async function openUpdatesModal() {
-  const backdrop = openModal(`<h3 class="reveal-on-load">What's New</h3><p class="muted">Loading&hellip;</p>`);
-  revealNow(backdrop.querySelector('h3'));
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
-
-  const res = await fetch('/api/updates');
-  renderUpdatesPanel(backdrop.querySelector('.modal-panel'), res.ok ? await res.json() : []);
-}
-
-async function refreshUpdatesPanel(panel) {
-  const res = await fetch('/api/updates');
-  renderUpdatesPanel(panel, res.ok ? await res.json() : []);
-}
-
-function renderUpdatesPanel(panel, updates) {
-  const isAdmin = !!(currentUser && currentUser.isAdmin);
-
-  panel.innerHTML = `
-    <h3 class="reveal-on-load">What's New</h3>
-    <div class="updates-list">
-      ${updates.length === 0 ? '<p class="muted">Nothing posted yet.</p>' : updates.map((u) => `
-        <div class="update-item">
-          <div class="update-item-head">
-            <strong>${escapeAttr(u.title)}</strong>
-            <span class="muted">${new Date(u.created_at).toLocaleDateString()}</span>
-            ${isAdmin ? `<button type="button" class="danger small" data-action="delete-update" data-id="${u.id}">Delete</button>` : ''}
-          </div>
-          <p>${escapeAttr(u.body)}</p>
-        </div>
-      `).join('')}
-    </div>
-    ${isAdmin ? `
-      <form id="new-update-form">
-        <label>Title<input type="text" name="title" required /></label>
-        <label>Details<textarea name="body" rows="3" required></textarea></label>
-        <button type="submit">Post update</button>
-        <div id="new-update-status" class="error" aria-live="polite"></div>
-      </form>
-    ` : ''}
-    <div class="modal-actions">
-      <button type="button" class="secondary" data-action="close">Close</button>
-    </div>
-  `;
-  revealNow(panel.querySelector('h3'));
-
-  panel.querySelector('[data-action="close"]').addEventListener('click', () => closeModal(panel.closest('.modal-backdrop')));
-
-  panel.querySelectorAll('[data-action="delete-update"]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      await fetch(`/api/updates/${btn.dataset.id}`, { method: 'DELETE' });
-      refreshUpdatesPanel(panel);
-    });
-  });
-
-  const form = panel.querySelector('#new-update-form');
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const statusEl = form.querySelector('#new-update-status');
-      statusEl.textContent = '';
-      const res = await fetch('/api/updates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: form.title.value, body: form.body.value }),
-      });
-      const data = await res.json();
-      if (!res.ok) { statusEl.textContent = data.error; return; }
-      refreshUpdatesPanel(panel);
-    });
-  }
-}
-
-// ============================================================
-// Feedback — free-text message from a signed-in seller, emailed to
-// the admin (see routes/feedback.js) and kept in the DB either way.
-// ============================================================
-function openFeedbackModal() {
-  const backdrop = openModal(`
-    <h3 class="reveal-on-load">Send Feedback</h3>
-    <p class="muted">Tell us what's working, what's not, or what you'd like to see. This goes straight to the team.</p>
-    <form id="feedback-form">
-      <label>Message<textarea name="message" rows="5" required maxlength="5000"></textarea></label>
-      <div id="feedback-status" class="error" aria-live="polite"></div>
-      <div class="modal-actions">
-        <button type="button" class="secondary" data-action="close">Cancel</button>
-        <button type="submit">Send</button>
-      </div>
-    </form>
-  `);
-  revealNow(backdrop.querySelector('h3'));
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
-  backdrop.querySelector('[data-action="close"]').addEventListener('click', () => closeModal(backdrop));
-
-  const form = backdrop.querySelector('#feedback-form');
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const statusEl = form.querySelector('#feedback-status');
-    statusEl.textContent = '';
-    const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-
-    try {
-      const res = await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: form.message.value }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send feedback');
-
-      const panel = backdrop.querySelector('.modal-panel');
-      panel.innerHTML = `
-        <div class="modal-success-icon">&#10003;</div>
-        <h3 class="reveal-on-load">Thanks!</h3>
-        <p class="muted">Your feedback has been sent.</p>
-        <div class="modal-actions"><button type="button" data-action="done">Done</button></div>
-      `;
-      revealNow(panel.querySelector('h3'));
-      panel.querySelector('[data-action="done"]').addEventListener('click', () => closeModal(backdrop));
-    } catch (err) {
-      statusEl.textContent = err.message;
-      submitBtn.disabled = false;
-    }
-  });
-}
+document.getElementById('updates-btn').addEventListener('click', () => {
+  window.location.href = '/updates.html';
+});
 
 // Builds a <select>'s options from eBay's real list of an item type (locations or one policy
 // type). If the currently-saved value isn't in that list (stale ID, or eBay-side deletion), it's
@@ -1272,7 +1183,7 @@ async function openEbaySettingsModal() {
   const backdrop = openModal(`
     <h3 class="reveal-on-load">eBay Settings</h3>
     <p class="muted">Loading your eBay locations and business policies&hellip;</p>
-  `);
+  `, 'eBay Settings');
   revealNow(backdrop.querySelector('h3'));
 
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
@@ -1326,10 +1237,15 @@ async function openEbaySettingsModal() {
       `}
 
       <div id="ebay-settings-status" aria-live="polite"></div>
-      <div class="modal-actions">
+      <div class="modal-actions" data-role="disconnect-actions">
         <button type="button" class="danger" data-action="disconnect">Disconnect eBay</button>
         <button type="button" class="secondary" data-action="close">Close</button>
         <button type="submit" ${needsReconnect ? 'disabled' : ''}>Save</button>
+      </div>
+      <div class="modal-actions" data-role="disconnect-confirm" hidden>
+        <span class="muted" style="align-self:center;">Disconnect eBay? You&rsquo;ll need to reconnect before publishing again.</span>
+        <button type="button" class="secondary" data-action="cancel-disconnect">Cancel</button>
+        <button type="button" class="danger" data-action="confirm-disconnect">Confirm Disconnect</button>
       </div>
     </form>
   `;
@@ -1340,8 +1256,19 @@ async function openEbaySettingsModal() {
 
   backdrop.querySelector('[data-action="close"]').addEventListener('click', () => closeModal(backdrop));
 
-  backdrop.querySelector('[data-action="disconnect"]').addEventListener('click', async () => {
-    if (!confirm('Disconnect your eBay account? You will need to reconnect before publishing again.')) return;
+  const disconnectActions = backdrop.querySelector('[data-role="disconnect-actions"]');
+  const disconnectConfirm = backdrop.querySelector('[data-role="disconnect-confirm"]');
+
+  backdrop.querySelector('[data-action="disconnect"]').addEventListener('click', () => {
+    disconnectActions.hidden = true;
+    disconnectConfirm.hidden = false;
+    disconnectConfirm.querySelector('[data-action="cancel-disconnect"]').focus();
+  });
+  backdrop.querySelector('[data-action="cancel-disconnect"]').addEventListener('click', () => {
+    disconnectConfirm.hidden = true;
+    disconnectActions.hidden = false;
+  });
+  backdrop.querySelector('[data-action="confirm-disconnect"]').addEventListener('click', async () => {
     await fetch('/api/ebay/disconnect', { method: 'POST' });
     closeModal(backdrop);
     boot();

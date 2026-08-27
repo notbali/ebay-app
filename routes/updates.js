@@ -4,7 +4,9 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.get('/', requireAuth, (req, res) => {
+// Public (no requireAuth) - "What's New" is now its own page, reachable without an account,
+// same as the Terms/Privacy pages. Posting and deleting stay admin-only below.
+router.get('/', (req, res) => {
   const updates = db.prepare('SELECT id, title, body, created_at FROM updates ORDER BY created_at DESC').all();
   res.json(updates);
 });

@@ -44,7 +44,6 @@
       <div class="account-bar" id="account-bar" hidden>
         <span class="badge" id="ebay-status-badge">Not connected</span>
         <button type="button" class="secondary" id="updates-btn">What's New</button>
-        <button type="button" class="secondary" id="feedback-btn">Feedback</button>
         <button type="button" class="secondary" id="settings-btn">Settings</button>
         <button type="button" class="secondary" id="logout-btn">Logout</button>
       </div>
@@ -90,7 +89,7 @@
           <form id="upload-form">
             <label>
               Photos (up to 12)
-              <div id="photo-dropzone" class="dropzone">
+              <div id="photo-dropzone" class="dropzone" role="button" tabindex="0" aria-label="Add photos">
                 <p>Drag &amp; drop photos here, or click to browse</p>
                 <input type="file" id="photo-input" name="photos" accept="image/*" multiple hidden />
               </div>
@@ -115,10 +114,14 @@
   </main>
 
   <footer class="site-footer">
-    <a href="/terms.html">Terms of Service</a>
-    <a href="/privacy.html">Privacy Policy</a>
+    <div class="site-footer-links">
+      <a href="/terms.html">Terms of Service</a>
+      <a href="/privacy.html">Privacy Policy</a>
+    </div>
+    <div id="feedback-widget" class="feedback-widget"></div>
   </footer>
 
   <script src="app.js"></script>
+  <script src="feedback-widget.js"></script>
 </body>
 </html>
