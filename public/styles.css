@@ -142,9 +142,8 @@ a:hover { color: var(--foam); }
 }
 
 /* ============================================================
-   Header brand mark — ship sails the width of the wordmark, ping-ponging
-   end to end (CSS offset-path + alternate direction), riding the wave's
-   contour as it travels. Speeds up smoothly on hover, eases back on leave.
+   Header brand mark — ship rests at a fixed point on the wave (no travel
+   animation; the landing page's hero now carries the ship motion).
    ============================================================ */
 .brand-wave {
   fill: none;
@@ -152,7 +151,6 @@ a:hover { color: var(--foam); }
   stroke-width: 1.3;
   opacity: 0.75;
 }
-.brand-ship-wake { fill: none; stroke: var(--current); stroke-width: 1.1; opacity: 0.3; }
 .brand-ship path:first-child { fill: var(--abyss); stroke: var(--current); stroke-width: 1.6; stroke-linejoin: round; }
 .brand-ship path:nth-child(2) { fill: none; stroke: var(--current); stroke-width: 1.5; }
 .brand-ship-sail-a { fill: var(--current); stroke: none; opacity: 0.92; }
@@ -161,24 +159,7 @@ a:hover { color: var(--foam); }
 .brand-ship-travel {
   offset-path: path("M0 22 q 12.5 -6 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0");
   offset-rotate: 0deg;
-  offset-distance: 50%; /* resting position when the animation is off (reduced motion) */
-  animation: brand-ship-sail 9s ease-in-out infinite alternate;
-}
-/* Hover speed-up is applied via the Web Animations API (playbackRate) in app.js, not by
-   changing animation-duration here - CSS recalculates progress as elapsed-time / duration on a
-   duration change, which jumps to a different point in the cycle instead of continuing smoothly
-   from wherever the ship currently is. playbackRate scales the existing timeline in place. */
-@keyframes brand-ship-sail {
-  from { offset-distance: 3%; }
-  to { offset-distance: 97%; }
-}
-
-@supports not (offset-path: path("M0 0")) {
-  .brand-ship-travel { animation: brand-ship-bob 1.8s ease-in-out infinite; offset-distance: unset; }
-  @keyframes brand-ship-bob {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-3px); }
-  }
+  offset-distance: 50%;
 }
 
 .site-header p {
@@ -723,7 +704,6 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   .voyage-map .voyage-ship-ghost-1,
   .voyage-map .voyage-ship-ghost-2,
   .voyage-map .voyage-dest circle,
-  .brand-ship-travel,
   .voyage-stage-list li.active::before,
   .draft-card.removing,
   .draft-card,

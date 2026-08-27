@@ -1,0 +1,224 @@
+/* ============================================================
+   Landing page — reuses design tokens, cards, and buttons from
+   styles.css. Additions here are landing-only: the hero voyage
+   scene, nav, step grid, trust list, and part pills.
+   ============================================================ */
+
+.landing-body { padding-bottom: 0; }
+
+/* ---- Header nav ---- */
+.landing-header-inner {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.landing-nav { display: flex; align-items: center; gap: 1.25rem; }
+.landing-nav-link {
+  color: var(--text-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+.landing-nav-link:hover { color: var(--foam); }
+.landing-nav-cta {
+  background: var(--current);
+  color: var(--abyss);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-sm);
+  transition: filter var(--dur-fast), box-shadow var(--dur-fast), transform 0.12s ease-out;
+}
+.landing-nav-cta:hover { filter: brightness(1.15); box-shadow: 0 4px 14px rgba(110, 146, 186, 0.35); }
+
+.landing-main { max-width: none; }
+
+/* ---- Hero ---- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  margin: 0 -1.5rem 2.5rem;
+  padding: 4.5rem 1.5rem 5rem;
+  background: linear-gradient(180deg, var(--abyss) 0%, var(--harbor) 100%);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.hero-voyage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.hero-voyage-svg { width: 100%; height: 100%; display: block; }
+
+.hero-route {
+  fill: none;
+  stroke: var(--current);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 10 14;
+  animation: hero-route-dash 2.2s linear infinite;
+}
+@keyframes hero-route-dash {
+  to { stroke-dashoffset: -48; }
+}
+
+.hero-ship-group {
+  offset-rotate: 0deg;
+  offset-distance: 6%;
+  animation: hero-ship-travel var(--hero-dur, 20s) ease-in-out infinite alternate;
+  animation-delay: var(--hero-delay, 0s);
+  transform: scale(var(--hero-scale, 1));
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes hero-ship-travel {
+  from { offset-distance: 4%; }
+  to { offset-distance: 96%; }
+}
+.hero-ship path:first-child { fill: var(--abyss); stroke: var(--current); stroke-width: 2; stroke-linejoin: round; }
+.hero-ship-sail { fill: var(--current); stroke: none; }
+
+.hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  border-radius: 32px;
+  text-align: center;
+  /* Soft vignette so hero text stays legible wherever a ship happens to be
+     crossing underneath it, without boxing the art out of the hero. */
+  background: radial-gradient(ellipse 85% 80% at center, rgba(15, 23, 41, 0.78) 0%, rgba(15, 23, 41, 0.55) 60%, rgba(15, 23, 41, 0) 100%);
+}
+.hero-eyebrow {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--current);
+}
+.hero-title {
+  margin: 0 0 1rem;
+  font-size: clamp(1.9rem, 4.5vw, 3rem);
+  line-height: 1.12;
+  font-weight: 900;
+}
+.hero-sub {
+  margin: 0 auto 2rem;
+  max-width: 520px;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--text-body);
+}
+.hero-actions { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+
+.hero-cta-primary, .hero-cta-secondary, .final-cta a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.98rem;
+  text-decoration: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-sm);
+  transition: filter var(--dur-fast), box-shadow var(--dur-fast), transform 0.12s ease-out;
+}
+.hero-cta-primary, .final-cta a {
+  background: var(--current);
+  color: var(--abyss);
+}
+.hero-cta-primary:hover, .final-cta a:hover { filter: brightness(1.15); box-shadow: 0 4px 14px rgba(110, 146, 186, 0.35); }
+.hero-cta-secondary {
+  background: transparent;
+  color: var(--foam);
+  border: 1px solid var(--tide);
+}
+.hero-cta-secondary:hover { background: rgba(110, 146, 186, 0.12); }
+.hero-cta-primary:active, .hero-cta-secondary:active, .final-cta a:active, .landing-nav-cta:active { transform: translateY(1px) !important; }
+
+/* ---- Section shell (reuses `section` card look via extra classes on the same element) ---- */
+.landing-section { max-width: 900px; margin-left: auto; margin-right: auto; }
+
+/* ---- How it works ---- */
+.how-it-works {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+.how-step { display: flex; flex-direction: column; gap: 0.4rem; }
+.how-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: rgba(110, 146, 186, 0.14);
+  color: var(--current);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.how-step h3 { margin: 0.2rem 0 0; font-size: 1rem; color: var(--text-heading); }
+.how-step p { margin: 0; font-size: 0.88rem; line-height: 1.5; color: var(--text-secondary); }
+
+/* ---- Trust section ---- */
+.trust-lead { font-size: 0.95rem; line-height: 1.55; color: var(--text-body); }
+.trust-list { list-style: none; margin: 1.1rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.trust-list li {
+  position: relative;
+  padding-left: 1.4rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+.trust-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--current);
+}
+.trust-list strong { color: var(--text-heading); }
+
+/* ---- Parts pills ---- */
+.parts-pills { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.1rem; }
+.part-pill {
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(110, 146, 186, 0.12);
+  border: 1px solid var(--border);
+  color: var(--text-body);
+}
+
+/* ---- Final CTA ---- */
+.final-cta { text-align: center; }
+.final-cta h2 { margin-bottom: 1.25rem; }
+
+/* ---- Responsive ---- */
+@media (max-width: 900px) {
+  .how-it-works { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .hero { margin: 0 -1rem 1.5rem; padding: 3rem 1rem 3.5rem; }
+  .how-it-works { grid-template-columns: 1fr; }
+  .landing-nav { gap: 0.75rem; }
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .hero-route, .hero-ship-group { animation: none !important; }
+}
