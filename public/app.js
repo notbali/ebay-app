@@ -472,45 +472,71 @@ function renderDraftCard(part) {
       </div>
     </div>
     <div class="fields">
-      <input type="text" data-field="ai_title" value="${escapeAttr(part.ai_title || '')}" placeholder="Title" />
-      <textarea data-field="ai_description" rows="3" placeholder="Description">${part.ai_description || ''}</textarea>
-      <div style="display:flex; gap:0.5rem;">
-        <input type="number" step="0.01" data-field="ai_price_low" value="${part.ai_price_low ?? ''}" placeholder="Price low" />
-        <input type="number" step="0.01" data-field="ai_price_high" value="${part.ai_price_high ?? ''}" placeholder="Price high" />
-        <input type="number" step="1" min="1" data-field="ai_quantity" value="${part.ai_quantity ?? 1}" placeholder="Qty" style="max-width:5rem;" />
+      <div class="manifest-section">
+        <p class="manifest-section-label">Cargo</p>
+        <label>Title
+          <input type="text" class="field-title" data-field="ai_title" value="${escapeAttr(part.ai_title || '')}" placeholder="e.g. Allen-Bradley 700-HC24Z24 relay, 24VDC, 8-pin" />
+        </label>
+        <label>Description
+          <textarea data-field="ai_description" rows="3" placeholder="Condition notes, what's included, anything a buyer should know">${part.ai_description || ''}</textarea>
+        </label>
       </div>
-      <select data-field="ai_condition">
-        ${CONDITION_OPTIONS.map(([value, label]) =>
-          `<option value="${value}" ${part.ai_condition === value ? 'selected' : ''}>${label}</option>`
-        ).join('')}
-      </select>
-      <div class="shipping-field">
-        <label style="flex-direction:row; align-items:center; gap:0.4rem;">
-          <input type="checkbox" data-field="ai_free_shipping" ${part.ai_free_shipping ? 'checked' : ''} style="width:auto;" />
+
+      <div class="manifest-section">
+        <p class="manifest-section-label">Valuation</p>
+        <div class="field-row">
+          <label>Price low
+            <input type="number" step="0.01" data-field="ai_price_low" value="${part.ai_price_low ?? ''}" placeholder="0.00" />
+          </label>
+          <label>Price high
+            <input type="number" step="0.01" data-field="ai_price_high" value="${part.ai_price_high ?? ''}" placeholder="0.00" />
+          </label>
+          <label class="field-qty">Qty
+            <input type="number" step="1" min="1" data-field="ai_quantity" value="${part.ai_quantity ?? 1}" />
+          </label>
+        </div>
+      </div>
+
+      <div class="manifest-section">
+        <p class="manifest-section-label">Freight</p>
+        <label>Condition
+          <select data-field="ai_condition">
+            ${CONDITION_OPTIONS.map(([value, label]) =>
+              `<option value="${value}" ${part.ai_condition === value ? 'selected' : ''}>${label}</option>`
+            ).join('')}
+          </select>
+        </label>
+        <label class="checkbox-field">
+          <input type="checkbox" data-field="ai_free_shipping" ${part.ai_free_shipping ? 'checked' : ''} />
           Free shipping (unchecked = calculated based on buyer's location)
         </label>
-        <div style="display:flex; gap:0.5rem;">
-          <input type="number" step="0.1" min="0" data-field="ai_weight_lb" value="${part.ai_weight_lb ?? ''}" placeholder="Weight (lb)" />
-          <input type="number" step="0.1" min="0" data-field="ai_length_in" value="${part.ai_length_in ?? ''}" placeholder="Length (in)" />
-          <input type="number" step="0.1" min="0" data-field="ai_width_in" value="${part.ai_width_in ?? ''}" placeholder="Width (in)" />
-          <input type="number" step="0.1" min="0" data-field="ai_height_in" value="${part.ai_height_in ?? ''}" placeholder="Height (in)" />
+        <div class="field-row">
+          <label>Weight (lb)<input type="number" step="0.1" min="0" data-field="ai_weight_lb" value="${part.ai_weight_lb ?? ''}" /></label>
+          <label>Length (in)<input type="number" step="0.1" min="0" data-field="ai_length_in" value="${part.ai_length_in ?? ''}" /></label>
+          <label>Width (in)<input type="number" step="0.1" min="0" data-field="ai_width_in" value="${part.ai_width_in ?? ''}" /></label>
+          <label>Height (in)<input type="number" step="0.1" min="0" data-field="ai_height_in" value="${part.ai_height_in ?? ''}" /></label>
         </div>
       </div>
-      <div class="category-field">
-        <div class="category-current ${!part.ai_category_id ? 'category-missing' : ''}">
-          Category: ${part.ai_category_name ? escapeAttr(part.ai_category_name) : 'not set - search below'}
+
+      <div class="manifest-section">
+        <p class="manifest-section-label">Manifest tags</p>
+        <div class="category-field">
+          <div class="category-current ${!part.ai_category_id ? 'category-missing' : ''}">
+            Category: ${part.ai_category_name ? escapeAttr(part.ai_category_name) : 'not set - search below'}
+          </div>
+          <div class="category-search">
+            <input type="text" class="category-search-input" aria-label="Search eBay categories" placeholder="Search eBay categories (e.g. &quot;hydraulic filter&quot;)" />
+            <button type="button" class="secondary category-search-btn">Search</button>
+          </div>
+          <div class="category-results"></div>
         </div>
-        <div class="category-search">
-          <input type="text" class="category-search-input" aria-label="Search eBay categories" placeholder="Search eBay categories (e.g. &quot;hydraulic filter&quot;)" />
-          <button type="button" class="secondary category-search-btn">Search</button>
+        <div class="specifics-field">
+          <p class="field-sublabel">Item specifics</p>
+          <div class="specifics-ledger" data-role="specifics-ledger">${buildSpecificsLedger(specifics)}</div>
+          <button type="button" class="specifics-add" data-action="add-specific">+ Add specific</button>
         </div>
-        <div class="category-results"></div>
       </div>
-      <div class="specifics-field">
-        <label style="font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em;">Specifics</label>
-        <div class="specifics-ledger" data-role="specifics-ledger">${buildSpecificsLedger(specifics)}</div>
-        <button type="button" class="specifics-add" data-action="add-specific">+ Add specific</button>
-      </div>
+
       ${part.error_message ? `<span class="error">${escapeAttr(part.error_message)}</span>` : ''}
       <div class="actions">
         <button class="secondary" data-action="save">Save edits</button>

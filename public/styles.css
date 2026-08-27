@@ -302,6 +302,27 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 .draft-card .fields { display: flex; flex-direction: column; gap: 0.5rem; }
 .draft-card input, .draft-card textarea, .draft-card select { width: 100%; }
 
+/* --- Manifest sections: the edit fields grouped like a real cargo manifest
+   (what it is / what it's worth / how it ships / how it's classified),
+   separated by the same dashed rule the dropzone already uses. --- */
+.manifest-section {
+  display: flex; flex-direction: column; gap: 0.6rem;
+  padding-top: 0.9rem; border-top: 1px dashed var(--border);
+}
+.manifest-section:first-child { padding-top: 0; border-top: none; }
+.manifest-section-label {
+  margin: 0; font-family: var(--font-body); font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--current);
+}
+.field-title { font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; color: var(--text-heading); }
+.field-sublabel { margin: 0; font-size: 0.78rem; color: var(--text-secondary); }
+
+.field-row { display: flex; gap: 0.5rem; }
+.field-row > label { flex: 1; min-width: 0; }
+.field-row > .field-qty { flex: 0 0 4.5rem; }
+.checkbox-field { flex-direction: row; align-items: center; gap: 0.4rem; }
+.checkbox-field input[type="checkbox"] { width: auto; }
+
 .card-topline {
   display: flex;
   align-items: flex-start;
@@ -372,8 +393,6 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 #upload-status { margin-top: 0.75rem; font-size: 0.9rem; color: var(--text-secondary); }
 .error { color: #e29b87; }
 .muted { color: var(--text-secondary); }
-
-.shipping-field { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem; color: var(--text-secondary); }
 
 /* --- Specifics ledger: key/value rows, entered on the manifest like cargo line items --- */
 .specifics-ledger { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -690,6 +709,8 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   .harbor-board-item { flex: 1 1 45%; border-bottom: 1px solid var(--border); }
   .specifics-row { flex-wrap: wrap; }
   .specifics-row .specifics-key, .specifics-row .specifics-value { flex: 1 1 100%; }
+  .field-row { flex-wrap: wrap; }
+  .field-row > label, .field-row > .field-qty { flex: 1 1 100%; }
 }
 
 /* ============================================================
