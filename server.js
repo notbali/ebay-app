@@ -7,6 +7,7 @@ const ebayAuthRouter = require('./routes/ebayAuth');
 const uploadsRouter = require('./routes/uploads');
 const updatesRouter = require('./routes/updates');
 const feedbackRouter = require('./routes/feedback');
+const onboardingRouter = require('./routes/onboarding');
 const { securityHeaders } = require('./middleware/securityHeaders');
 const { pruneExpiredSessions } = require('./middleware/auth');
 
@@ -26,6 +27,7 @@ app.use('/api/ebay', ebayAuthRouter);
 app.use('/api/parts', partsRouter);
 app.use('/api/updates', updatesRouter);
 app.use('/api/feedback', feedbackRouter);
+app.use('/api/onboarding', onboardingRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
