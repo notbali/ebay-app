@@ -3,6 +3,9 @@ const statusEl = document.getElementById('upload-status');
 const uploadPanel = document.getElementById('upload-panel');
 const draftsList = document.getElementById('drafts-list');
 const harborBoard = document.getElementById('harbor-board');
+const manifestSearch = document.getElementById('manifest-search');
+const manifestStatusFilter = document.getElementById('manifest-status-filter');
+const manifestSort = document.getElementById('manifest-sort');
 
 const authSection = document.getElementById('auth-section');
 const connectGateSection = document.getElementById('connect-gate-section');
@@ -402,19 +405,40 @@ function renderHarborBoard(parts) {
 // ============================================================
 // Drafts list
 // ============================================================
+function buildManifestQuery() {
+  const params = new URLSearchParams();
+  const q = manifestSearch.value.trim();
+  if (q) params.set('q', q);
+  if (manifestStatusFilter.value) params.set('status', manifestStatusFilter.value);
+  if (manifestSort.value && manifestSort.value !== 'newest') params.set('sort', manifestSort.value);
+  return params;
+}
+
+async function fetchParts(params) {
+  const qs = params.toString();
+  const res = await fetch(`/api/parts${qs ? `?${qs}` : ''}`);
+  return res.json();
+}
+
 async function loadDrafts() {
-  const res = await fetch('/api/parts');
-  const parts = await res.json();
+  const params = buildManifestQuery();
+  const hasFilters = params.toString() !== '';
+  const filtered = await fetchParts(params);
+  // The harbor board tallies every stage, not just the filtered view - refetch the full,
+  // unfiltered list for it only when a filter is actually narrowing the results.
+  const allParts = hasFilters ? await fetchParts(new URLSearchParams()) : filtered;
+  renderHarborBoard(allParts);
+
   draftsList.innerHTML = '';
 
-  renderHarborBoard(parts);
-
-  if (parts.length === 0) {
-    draftsList.innerHTML = '<p class="muted">No cargo in port yet — prepare your first listing above.</p>';
+  if (filtered.length === 0) {
+    draftsList.innerHTML = hasFilters
+      ? '<p class="muted">No listings match your search or filters.</p>'
+      : '<p class="muted">No cargo in port yet — prepare your first listing above.</p>';
     return;
   }
 
-  const cards = parts.map(renderDraftCard);
+  const cards = filtered.map(renderDraftCard);
   cards.forEach((card) => {
     card.classList.add('entering');
     draftsList.appendChild(card);
@@ -427,6 +451,14 @@ async function loadDrafts() {
     });
   });
 }
+
+let manifestSearchDebounce;
+manifestSearch.addEventListener('input', () => {
+  clearTimeout(manifestSearchDebounce);
+  manifestSearchDebounce = setTimeout(loadDrafts, 300);
+});
+manifestStatusFilter.addEventListener('change', loadDrafts);
+manifestSort.addEventListener('change', loadDrafts);
 
 function renderDraftCard(part) {
   const card = document.createElement('div');

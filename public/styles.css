@@ -301,6 +301,10 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 .field-row { display: flex; gap: 0.5rem; }
 .field-row > label { flex: 1; min-width: 0; }
 .field-row > .field-qty { flex: 0 0 4.5rem; }
+
+.manifest-filters { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.manifest-filters #manifest-search { flex: 1; min-width: 0; }
+.manifest-filters select { flex: 0 0 auto; width: auto; }
 .checkbox-field { flex-direction: row; align-items: center; gap: 0.4rem; }
 .checkbox-field input[type="checkbox"] { width: auto; }
 
@@ -692,6 +696,9 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   .specifics-row .specifics-key, .specifics-row .specifics-value { flex: 1 1 100%; }
   .field-row { flex-wrap: wrap; }
   .field-row > label, .field-row > .field-qty { flex: 1 1 100%; }
+  .manifest-filters { flex-wrap: wrap; }
+  .manifest-filters #manifest-search { flex: 1 1 100%; }
+  .manifest-filters select { flex: 1 1 auto; }
 }
 
 /* ============================================================
