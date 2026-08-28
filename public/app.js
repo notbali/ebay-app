@@ -1168,6 +1168,7 @@ document.getElementById('connect-ebay-btn').addEventListener('click', () => {
 });
 
 document.getElementById('settings-btn').addEventListener('click', openEbaySettingsModal);
+document.getElementById('account-btn').addEventListener('click', openAccountModal);
 document.getElementById('updates-btn').addEventListener('click', () => {
   window.location.href = '/updates.html';
 });
@@ -1300,6 +1301,103 @@ async function openEbaySettingsModal() {
     const data = await res.json();
     if (!res.ok) { statusEl.textContent = data.error; statusEl.className = 'error'; return; }
     closeModal(backdrop);
+    boot();
+  });
+}
+
+// ============================================================
+// Account: change password / delete account
+// ============================================================
+async function openAccountModal() {
+  const backdrop = openModal(`
+    <h3 class="reveal-on-load">Account</h3>
+    <p class="muted">Signed in as ${escapeAttr(currentUser ? currentUser.email : '')}</p>
+
+    <form id="change-password-form">
+      <label>Current Password<input type="password" name="currentPassword" required autocomplete="current-password" /></label>
+      <label>New Password (min 8 characters)<input type="password" name="newPassword" required minlength="8" autocomplete="new-password" /></label>
+      <label>Confirm New Password<input type="password" name="confirmPassword" required minlength="8" autocomplete="new-password" /></label>
+      <div id="change-password-status" aria-live="polite"></div>
+      <div class="modal-actions">
+        <button type="submit">Update Password</button>
+      </div>
+    </form>
+
+    <p class="muted">Deleting your account permanently removes your listings, drafts, and eBay connection from The Bali Bay. This cannot be undone.</p>
+    <div data-role="delete-actions">
+      <div class="modal-actions">
+        <button type="button" class="danger" data-action="delete">Delete Account</button>
+        <button type="button" class="secondary" data-action="close">Close</button>
+      </div>
+    </div>
+    <div data-role="delete-confirm" hidden>
+      <label>Enter your password to confirm<input type="password" id="delete-account-password" autocomplete="current-password" /></label>
+      <div id="delete-account-status" aria-live="polite"></div>
+      <div class="modal-actions">
+        <button type="button" class="secondary" data-action="cancel-delete">Cancel</button>
+        <button type="button" class="danger" data-action="confirm-delete">Permanently Delete Account</button>
+      </div>
+    </div>
+  `, 'Account');
+  revealNow(backdrop.querySelector('h3'));
+
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
+  backdrop.querySelector('[data-action="close"]').addEventListener('click', () => closeModal(backdrop));
+
+  const pwForm = backdrop.querySelector('#change-password-form');
+  const pwStatus = backdrop.querySelector('#change-password-status');
+  pwForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    pwStatus.textContent = '';
+    pwStatus.className = '';
+    const { currentPassword, newPassword, confirmPassword } = pwForm;
+    if (newPassword.value !== confirmPassword.value) {
+      pwStatus.textContent = 'New passwords do not match';
+      pwStatus.className = 'error';
+      return;
+    }
+    const res = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: currentPassword.value, newPassword: newPassword.value }),
+    });
+    if (!res.ok) {
+      pwStatus.textContent = await describeError(res);
+      pwStatus.className = 'error';
+      return;
+    }
+    pwStatus.textContent = 'Password updated.';
+    pwStatus.className = '';
+    pwForm.reset();
+  });
+
+  const deleteActions = backdrop.querySelector('[data-role="delete-actions"]');
+  const deleteConfirm = backdrop.querySelector('[data-role="delete-confirm"]');
+  const deleteStatus = backdrop.querySelector('#delete-account-status');
+  const deletePasswordInput = backdrop.querySelector('#delete-account-password');
+
+  backdrop.querySelector('[data-action="delete"]').addEventListener('click', () => {
+    deleteActions.hidden = true;
+    deleteConfirm.hidden = false;
+    deletePasswordInput.focus();
+  });
+  backdrop.querySelector('[data-action="cancel-delete"]').addEventListener('click', () => {
+    deleteConfirm.hidden = true;
+    deleteActions.hidden = false;
+  });
+  backdrop.querySelector('[data-action="confirm-delete"]').addEventListener('click', async () => {
+    const res = await fetch('/api/auth/delete-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: deletePasswordInput.value }),
+    });
+    if (!res.ok) {
+      deleteStatus.textContent = await describeError(res);
+      deleteStatus.className = 'error';
+      return;
+    }
+    closeModal(backdrop);
+    currentUser = null;
     boot();
   });
 }
