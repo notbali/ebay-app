@@ -1263,14 +1263,44 @@ function buildPickerOptions(items, idKey, labelKey, currentValue) {
   return `<option value="">Select...</option>${opts.join('')}`;
 }
 
+// Renders the Sunrise/Sunset/System radios, reflecting the currently-stored
+// preference. Rendered independently of the eBay-specific fetch below (and
+// re-rendered into both the loading and loaded states of the modal) so
+// appearance is never blocked on eBay network calls.
+function buildAppearanceSectionHtml() {
+  const current = Theme.readPreference(window.localStorage);
+  const options = [
+    { value: 'light', label: 'Sunrise' },
+    { value: 'dark', label: 'Sunset' },
+    { value: 'system', label: 'System' },
+  ];
+  return `
+    <div class="manifest-section">
+      <p class="manifest-section-label">Appearance</p>
+      <div class="theme-picker" role="radiogroup" aria-label="Appearance">
+        ${options.map((opt) => `
+          <label class="theme-option">
+            <input type="radio" name="theme-preference" value="${opt.value}" ${current === opt.value ? 'checked' : ''} />
+            ${opt.label}
+          </label>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 async function openEbaySettingsModal() {
   const backdrop = openModal(`
     <h3 class="reveal-on-load">eBay Settings</h3>
+    ${buildAppearanceSectionHtml()}
     <p class="muted">Loading your eBay locations and business policies&hellip;</p>
   `, 'eBay Settings');
   revealNow(backdrop.querySelector('h3'));
 
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop); });
+  backdrop.addEventListener('change', (e) => {
+    if (e.target.name === 'theme-preference') Theme.setPreference(window, e.target.value);
+  });
 
   const [settings, locationsRes, policiesRes] = await Promise.all([
     fetch('/api/ebay/settings').then((r) => r.json()),
@@ -1289,6 +1319,7 @@ async function openEbaySettingsModal() {
   const panel = backdrop.querySelector('.modal-panel');
   panel.innerHTML = `
     <h3 class="reveal-on-load">eBay Settings</h3>
+    ${buildAppearanceSectionHtml()}
     <p class="muted">Picked live from your own eBay Seller Hub account.</p>
     <form id="ebay-settings-form">
       <label>Ship-From Location

@@ -1,33 +1,37 @@
 /* ============================================================
    The Bali Bay — design tokens
-   Dark "midnight bay" palette from the provided navy/steel-blue swatch
-   (palest band intentionally dropped, so the app runs as a dark theme):
-   abyss = deepest surfaces/bg, harbor = card surfaces, tide = borders/muted,
-   current = primary interactive accent (ship/routes/buttons).
-   foam is a plain near-white for text-on-dark only - not a decorative
-   swatch color. danger is a deliberate off-palette exception (a muted
-   rust/copper, not a brand blue) reserved for destructive/error states,
+   Sunrise (light) / Sunset (dark) theme system. Sunrise is the default
+   palette on bare :root; Sunset applies either from the OS
+   prefers-color-scheme (unless the user explicitly picked Sunrise) or
+   from an explicit [data-theme="dark"] override — see Theme (theme.js)
+   for how that attribute gets set. Semantic roles: bg = page background,
+   surface = card backgrounds, border-strong = borders/muted decorative
+   elements, accent = primary interactive color (buttons/links/routes),
+   text-on-accent = text color for content sitting on an accent-colored
+   background (e.g. button labels). danger is a deliberate off-palette
+   rust/copper (not accent-colored) reserved for destructive/error states,
    since color-coding "something is wrong" needs a hue distinct from the
-   all-blue brand accent to stay legible as a signal.
+   brand accent to stay legible as a signal.
    ============================================================ */
 :root {
-  --abyss: #0F1729;
-  --harbor: #1B2A40;
-  --tide: #3E5779;
-  --current: #6E92BA;
-  --current-deep: #547A9E;
-  --foam: #EEF1F6;
+  /* Sunrise (light) — default */
+  --bg: #F6E9D8;
+  --surface: #FFF6EC;
+  --border-strong: #C9A27C;
+  --accent: #E8734A;
+  --accent-deep: #C85A32;
+  --text-on-accent: #FFFBF6;
 
-  --danger: #B4553B;
-  --danger-deep: #954432;
+  --danger: #B4442A;
+  --danger-deep: #8C3520;
+  --danger-text: #A34A32;
 
-  --text-heading: var(--foam);
-  --text-body: #C9D2DE;
-  --text-secondary: #90A4BE; /* lightened tide - meets WCAG AA on abyss/harbor, true tide reserved for non-text UI */
-  --text-on-dark: var(--foam);
+  --text-heading: #3A2418;
+  --text-body: #5B4636;
+  --text-secondary: #8A6F58; /* meets WCAG AA on bg/surface */
 
-  --border: rgba(110, 146, 186, 0.28); /* current, translucent */
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.5);
+  --border: color-mix(in srgb, var(--accent) 28%, transparent);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 10px 30px rgba(58, 36, 24, 0.12);
 
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -39,11 +43,51 @@
   --dur-base: 320ms;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1F1522;
+    --surface: #34212F;
+    --border-strong: #6B4A5E;
+    --accent: #F2905B;
+    --accent-deep: #D9683E;
+    --text-on-accent: #241726;
+
+    --danger: #B4553B;
+    --danger-deep: #954432;
+    --danger-text: #E29B87;
+
+    --text-heading: #FBEEE6;
+    --text-body: #E4CFC7;
+    --text-secondary: #B99287;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1F1522;
+  --surface: #34212F;
+  --border-strong: #6B4A5E;
+  --accent: #F2905B;
+  --accent-deep: #D9683E;
+  --text-on-accent: #241726;
+
+  --danger: #B4553B;
+  --danger-deep: #954432;
+  --danger-text: #E29B87;
+
+  --text-heading: #FBEEE6;
+  --text-body: #E4CFC7;
+  --text-secondary: #B99287;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
 * { box-sizing: border-box; }
 
 body {
   font-family: var(--font-body);
-  background: var(--abyss);
+  background: var(--bg);
   color: var(--text-body);
   margin: 0;
   padding: 0 1.5rem 4rem;
@@ -51,8 +95,8 @@ body {
 
 h1, h2, h3 { font-family: var(--font-display); color: var(--text-heading); }
 
-a { color: var(--current); }
-a:hover { color: var(--foam); }
+a { color: var(--accent); }
+a:hover { color: var(--text-heading); }
 
 /* ============================================================
    Reveal-on-load — headings fade+lift in once, used sparingly
@@ -83,6 +127,7 @@ a:hover { color: var(--foam); }
   height: 100%;
   animation: water-drift 80s linear infinite;
 }
+.water-bg-lines { stroke: var(--border-strong); }
 @keyframes water-drift {
   from { transform: translateX(0); }
   to { transform: translateX(-52.5%); }
@@ -92,11 +137,11 @@ a:hover { color: var(--foam); }
    Header — "command center" bar
    ============================================================ */
 .site-header {
-  background: var(--abyss);
-  color: var(--text-on-dark);
+  background: var(--bg);
+  color: var(--text-heading);
   margin: 0 -1.5rem 2rem;
   padding: 1.75rem 1.5rem;
-  border-bottom: 3px solid var(--current);
+  border-bottom: 3px solid var(--accent);
 }
 
 .site-header-inner {
@@ -121,7 +166,7 @@ a:hover { color: var(--foam); }
   font-size: 0.65rem;
   font-weight: 500;
   letter-spacing: 0.32em;
-  color: var(--foam);
+  color: var(--text-heading);
   opacity: 0.6;
 }
 
@@ -131,7 +176,7 @@ a:hover { color: var(--foam); }
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1;
-  color: var(--text-on-dark);
+  color: var(--text-heading);
 }
 
 .wordmark svg {
@@ -147,14 +192,14 @@ a:hover { color: var(--foam); }
    ============================================================ */
 .brand-wave {
   fill: none;
-  stroke: var(--tide);
+  stroke: var(--border-strong);
   stroke-width: 1.3;
   opacity: 0.75;
 }
-.brand-ship path:first-child { fill: var(--abyss); stroke: var(--current); stroke-width: 1.6; stroke-linejoin: round; }
-.brand-ship path:nth-child(2) { fill: none; stroke: var(--current); stroke-width: 1.5; }
-.brand-ship-sail-a { fill: var(--current); stroke: none; opacity: 0.92; }
-.brand-ship-sail-b { fill: var(--current); stroke: none; opacity: 0.5; }
+.brand-ship path:first-child { fill: var(--bg); stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; }
+.brand-ship path:nth-child(2) { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.brand-ship-sail-a { fill: var(--accent); stroke: none; opacity: 0.92; }
+.brand-ship-sail-b { fill: var(--accent); stroke: none; opacity: 0.5; }
 
 .brand-ship-travel {
   offset-path: path("M0 22 q 12.5 -6 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0");
@@ -164,7 +209,7 @@ a:hover { color: var(--foam); }
 
 .site-header p {
   margin: 0.3rem 0 0;
-  color: var(--foam);
+  color: var(--text-heading);
   opacity: 0.75;
   font-size: 0.9rem;
 }
@@ -172,8 +217,8 @@ a:hover { color: var(--foam); }
 /* --- Account bar: connection badge + settings/logout, shown once logged in --- */
 .account-bar { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.9rem; flex-wrap: wrap; }
 .account-bar[hidden] { display: none; }
-.account-bar .badge.connected { background: rgba(110, 146, 186, 0.22); color: var(--current); }
-.account-bar .badge.not-connected { background: rgba(180, 85, 59, 0.16); color: #e29b87; }
+.account-bar .badge.connected { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.account-bar .badge.not-connected { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger-text); }
 
 /* --- Auth / connect gates: centered, narrower than the full dashboard width --- */
 .auth-section .upload-panel, .connect-gate .upload-panel { max-width: 420px; margin: 0 auto; }
@@ -182,7 +227,7 @@ a:hover { color: var(--foam); }
 main { max-width: 900px; margin: 0 auto; }
 
 section {
-  background: var(--harbor);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -214,17 +259,17 @@ label { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem; c
 input, textarea, select {
   font-family: inherit; font-size: 0.95rem; padding: 0.55rem 0.65rem;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--abyss); color: var(--text-body);
+  background: var(--bg); color: var(--text-body);
 }
 input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid var(--current); outline-offset: 2px;
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
 button {
   font-family: var(--font-body);
-  background: var(--current);
-  color: var(--abyss);
+  background: var(--accent);
+  color: var(--text-on-accent);
   border: none;
   padding: 0.6rem 1.2rem;
   border-radius: var(--radius-sm);
@@ -234,18 +279,18 @@ button {
   width: fit-content;
   transition: background var(--dur-fast), transform 0.12s ease-out, box-shadow var(--dur-fast);
 }
-button:hover:not(:disabled) { background: var(--foam); box-shadow: 0 4px 14px rgba(110, 146, 186, 0.35); }
+button:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
 button:active:not(:disabled) { transform: translateY(1px) !important; }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 button.secondary {
-  background: transparent; color: var(--foam);
-  border: 1px solid var(--tide);
+  background: transparent; color: var(--text-heading);
+  border: 1px solid var(--border-strong);
 }
-button.secondary:hover:not(:disabled) { background: rgba(110, 146, 186, 0.12); box-shadow: none; }
+button.secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: none; }
 
 button.danger { background: var(--danger); color: #fff; }
-button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow: 0 4px 14px rgba(180, 85, 59, 0.35); }
+button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow: 0 4px 14px color-mix(in srgb, var(--danger) 35%, transparent); }
 
 /* ============================================================
    Draft cards — "voyage manifest" tickets
@@ -254,7 +299,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--abyss);
+  background: var(--bg);
   padding: 1rem;
   margin-bottom: 1rem;
   display: flex;
@@ -266,14 +311,14 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   content: "";
   position: absolute; inset: 0;
   border-radius: inherit;
-  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), rgba(110, 146, 186, 0.12), transparent 70%);
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
   opacity: 0;
   transition: opacity 0.35s ease;
   pointer-events: none;
 }
 .draft-card:hover {
   transform: translateY(-3px);
-  border-color: var(--current);
+  border-color: var(--accent);
   box-shadow: var(--shadow);
 }
 .draft-card:hover::before { opacity: 1; }
@@ -293,7 +338,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 .manifest-section:first-child { padding-top: 0; border-top: none; }
 .manifest-section-label {
   margin: 0; font-family: var(--font-body); font-size: 0.68rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.1em; color: var(--current);
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent);
 }
 .field-title { font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; color: var(--text-heading); }
 .field-sublabel { margin: 0; font-size: 0.78rem; color: var(--text-secondary); }
@@ -318,7 +363,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 /* --- Photo gallery & dropzones --- */
 .photo-gallery { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .placeholder {
-  width: 90px; height: 90px; background: var(--harbor); border: 1px dashed var(--border);
+  width: 90px; height: 90px; background: var(--surface); border: 1px dashed var(--border);
   border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;
   color: var(--text-secondary); font-size: 0.75rem; text-align: center;
 }
@@ -328,7 +373,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 .thumb button {
   position: absolute; top: -6px; right: -6px;
   width: 22px; height: 22px; padding: 0; min-width: 0;
-  border-radius: 50%; background: var(--abyss); color: var(--foam); border: 1px solid var(--border);
+  border-radius: 50%; background: var(--bg); color: var(--text-heading); border: 1px solid var(--border);
   font-size: 0.85rem; line-height: 1; display: flex; align-items: center; justify-content: center;
 }
 .thumb button::after {
@@ -339,7 +384,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 }
 
 .dropzone {
-  border: 2px dashed var(--tide);
+  border: 2px dashed var(--border-strong);
   border-radius: var(--radius);
   padding: 1.5rem;
   text-align: center;
@@ -347,7 +392,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   cursor: pointer;
   transition: border-color var(--dur-fast), background var(--dur-fast);
 }
-.dropzone:hover, .dropzone.dragover { border-color: var(--current); background: rgba(110, 146, 186, 0.08); }
+.dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .dropzone p { margin: 0; font-size: 0.85rem; }
 
 .dropzone-small {
@@ -364,19 +409,19 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  background: rgba(110, 146, 186, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--text-secondary);
   width: fit-content;
 }
 .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.badge.stage-inport { background: rgba(110, 146, 186, 0.14); color: var(--text-secondary); }
-.badge.stage-ready { background: rgba(110, 146, 186, 0.22); color: var(--current); }
-.badge.stage-delayed { background: rgba(180, 85, 59, 0.2); color: #e29b87; }
-.badge.stage-delivered { background: rgba(110, 146, 186, 0.28); color: var(--foam); }
+.badge.stage-inport { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text-secondary); }
+.badge.stage-ready { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.badge.stage-delayed { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger-text); }
+.badge.stage-delivered { background: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--text-heading); }
 
 .actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; flex-wrap: wrap; }
 #upload-status { margin-top: 0.75rem; font-size: 0.9rem; color: var(--text-secondary); }
-.error { color: #e29b87; }
+.error { color: var(--danger-text); }
 .muted { color: var(--text-secondary); }
 
 /* --- Specifics ledger: key/value rows, entered on the manifest like cargo line items --- */
@@ -397,20 +442,20 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   position: absolute;
   inset: -5px;
 }
-.specifics-row-remove:hover:not(:disabled) { background: rgba(180, 85, 59, 0.14); color: #e29b87; border-color: var(--danger); }
+.specifics-row-remove:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger-text); border-color: var(--danger); }
 .specifics-add {
   align-self: flex-start;
-  background: transparent; color: var(--current);
-  border: 1px dashed var(--tide); font-size: 0.82rem; font-weight: 600;
+  background: transparent; color: var(--accent);
+  border: 1px dashed var(--border-strong); font-size: 0.82rem; font-weight: 600;
   padding: 0.4rem 0.7rem;
 }
-.specifics-add:hover:not(:disabled) { background: rgba(110, 146, 186, 0.08); box-shadow: none; border-color: var(--current); }
+.specifics-add:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 8%, transparent); box-shadow: none; border-color: var(--accent); }
 .specifics-empty { font-size: 0.82rem; color: var(--text-secondary); font-style: italic; }
 
 /* --- eBay category lookup/search --- */
 .category-field { display: flex; flex-direction: column; gap: 0.4rem; }
 .category-current { font-size: 0.85rem; }
-.category-current.category-missing { color: #e29b87; }
+.category-current.category-missing { color: var(--danger-text); }
 .category-search { display: flex; gap: 0.5rem; }
 .category-search-input { flex: 1; }
 .category-results { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -420,7 +465,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   padding: 0.4rem 0.6rem; border-radius: var(--radius-sm); width: 100%; text-align: left;
   transition: border-color var(--dur-fast), background var(--dur-fast);
 }
-.category-result:hover { border-color: var(--current); background: rgba(110, 146, 186, 0.08); }
+.category-result:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .category-result .muted { font-size: 0.75rem; }
 
 /* ============================================================
@@ -449,7 +494,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   line-height: 1;
   color: var(--text-heading);
 }
-.harbor-board-item.has-stage .harbor-board-count { color: var(--current); }
+.harbor-board-item.has-stage .harbor-board-count { color: var(--accent); }
 .harbor-board-label {
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -467,11 +512,11 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   display: flex; align-items: center; justify-content: center;
   transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
 }
-.delete-trigger:hover:not(:disabled) { background: rgba(180, 85, 59, 0.14); color: #e29b87; border-color: var(--danger); }
+.delete-trigger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger-text); border-color: var(--danger); }
 
 .delete-popover {
   position: absolute; top: 3.2rem; right: 1rem; z-index: 5;
-  background: var(--harbor); border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow); padding: 0.9rem; width: min(280px, calc(100% - 2rem));
   display: none; flex-direction: column; gap: 0.6rem;
 }
@@ -488,29 +533,29 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
    Voyage map — shared by generation + shipping loading states
    ============================================================ */
 .voyage-map { display: block; width: 100%; height: auto; }
-.voyage-map .voyage-water { fill: var(--abyss); }
-.voyage-map .voyage-chart-line { stroke: var(--tide); opacity: 0.5; }
+.voyage-map .voyage-water { fill: var(--bg); }
+.voyage-map .voyage-chart-line { stroke: var(--border-strong); opacity: 0.5; }
 
 .voyage-map .voyage-route {
-  fill: none; stroke: var(--current); stroke-width: 2.5; stroke-linecap: round;
+  fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round;
 }
 .voyage-map .voyage-route.drawing { transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1); }
 .voyage-map .voyage-route.charted {
   stroke-dasharray: 6 8;
   animation: voyage-dash 1.6s linear infinite;
 }
-.voyage-map .voyage-waypoint { fill: var(--tide); }
-.voyage-map .voyage-port circle { fill: var(--current); }
+.voyage-map .voyage-waypoint { fill: var(--border-strong); }
+.voyage-map .voyage-port circle { fill: var(--accent); }
 .voyage-map .voyage-port text, .voyage-map .voyage-dest text {
   font-family: var(--font-body); font-size: 11px; font-weight: 600; fill: var(--text-heading);
 }
 .voyage-map .voyage-dest circle {
-  fill: var(--current);
+  fill: var(--accent);
   animation: pulse-dot 1.8s ease-in-out infinite;
 }
-.voyage-map .voyage-ship { fill: var(--current); stroke: var(--abyss); stroke-width: 0.6; }
-.voyage-map .voyage-ship-sail { fill: var(--foam); }
-.voyage-map .voyage-ship-wake { fill: none; stroke: var(--current); stroke-width: 1.2; opacity: 0.35; }
+.voyage-map .voyage-ship { fill: var(--accent); stroke: var(--bg); stroke-width: 0.6; }
+.voyage-map .voyage-ship-sail { fill: var(--text-heading); }
+.voyage-map .voyage-ship-wake { fill: none; stroke: var(--accent); stroke-width: 1.2; opacity: 0.35; }
 
 @keyframes voyage-dash {
   to { stroke-dashoffset: -28; }
@@ -548,13 +593,13 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   transition: background 0.35s ease;
 }
 .voyage-stage-list li.active { color: var(--text-heading); font-weight: 600; transform: translateX(2px); }
-.voyage-stage-list li.active::before { background: var(--current); animation: pulse-dot 1.4s ease-in-out infinite; }
-.voyage-stage-list li.done { color: var(--current); }
-.voyage-stage-list li.done::before { background: var(--current); }
+.voyage-stage-list li.active::before { background: var(--accent); animation: pulse-dot 1.4s ease-in-out infinite; }
+.voyage-stage-list li.done { color: var(--accent); }
+.voyage-stage-list li.done::before { background: var(--accent); }
 
 @keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(110, 146, 186, 0.5); }
-  50% { box-shadow: 0 0 0 4px rgba(110, 146, 186, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 0%, transparent); }
 }
 
 /* ============================================================
@@ -563,7 +608,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 .upload-panel { position: relative; }
 .voyage-overlay {
   position: absolute; inset: 0; z-index: 4;
-  background: var(--harbor);
+  background: var(--surface);
   border-radius: var(--radius);
   padding: 1.25rem;
   display: flex; flex-direction: column;
@@ -573,8 +618,8 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
 .voyage-overlay .voyage-overlay-actions { margin-top: auto; display: flex; gap: 0.5rem; padding-top: 0.75rem; }
 .voyage-overlay.state-error { color: var(--text-body); }
 .voyage-overlay .voyage-error-msg {
-  background: rgba(180, 85, 59, 0.14); border: 1px solid var(--danger);
-  color: #e29b87; border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.88rem;
+  background: color-mix(in srgb, var(--danger) 14%, transparent); border: 1px solid var(--danger);
+  color: var(--danger-text); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.88rem;
 }
 
 @keyframes fade-in {
@@ -586,13 +631,13 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
    ============================================================ */
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 20;
-  background: rgba(15, 23, 41, 0.72);
+  background: rgba(0, 0, 0, 0.5);
   display: flex; align-items: center; justify-content: center;
   padding: 1.5rem;
   animation: fade-in var(--dur-base) ease;
 }
 .modal-panel {
-  background: var(--harbor); border-radius: var(--radius);
+  background: var(--surface); border-radius: var(--radius);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
   width: min(480px, 100%);
   max-height: 90vh; overflow-y: auto;
@@ -605,8 +650,22 @@ button.danger:hover:not(:disabled) { background: var(--danger-deep); box-shadow:
   display: flex; align-items: center; justify-content: center;
   margin-bottom: 0.75rem; color: #fff; font-size: 1.3rem; font-weight: 700;
 }
-.modal-panel .modal-success-icon { background: var(--current); color: var(--abyss); }
+.modal-panel .modal-success-icon { background: var(--accent); color: var(--text-on-accent); }
 .modal-panel .modal-error-icon { background: var(--danger-deep); }
+
+/* ============================================================
+   Appearance — Sunrise/Sunset/System picker (Settings modal)
+   ============================================================ */
+.theme-picker { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.theme-option {
+  flex-direction: row; align-items: center; gap: 0.4rem;
+  font-size: 0.85rem; color: var(--text-body);
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  padding: 0.35rem 0.8rem 0.35rem 0.6rem; cursor: pointer;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.theme-option:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text-heading); }
+.theme-option input[type="radio"] { width: auto; margin: 0; }
 
 .updates-list-page { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
 .update-item { border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; }
@@ -626,9 +685,9 @@ button.small { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
 .onboarding-checklist li.done > span:nth-child(2) { text-decoration: line-through; }
 .onboarding-check {
   flex: 0 0 1.4rem; height: 1.4rem; display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border); border-radius: 50%; font-size: 0.85rem; color: var(--current);
+  border: 1px solid var(--border); border-radius: 50%; font-size: 0.85rem; color: var(--accent);
 }
-.onboarding-checklist li.done .onboarding-check { background: var(--current); color: var(--abyss); border-color: var(--current); }
+.onboarding-checklist li.done .onboarding-check { background: var(--accent); color: var(--text-on-accent); border-color: var(--accent); }
 
 /* ============================================================
    Footer — links row, plus a standing feedback box on every page
@@ -650,11 +709,11 @@ button.small { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.site-footer a:hover { color: var(--foam); }
+.site-footer a:hover { color: var(--text-heading); }
 
 .feedback-widget { width: 100%; max-width: 420px; }
 .feedback-box {
-  background: var(--harbor);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1rem 1.25rem;
@@ -673,7 +732,7 @@ button.small { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
 .feedback-box textarea { width: 100%; }
 .feedback-box-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .feedback-box-actions button { flex-shrink: 0; }
-.feedback-box .feedback-sent { color: var(--current); font-size: 0.8rem; }
+.feedback-box .feedback-sent { color: var(--accent); font-size: 0.8rem; }
 
 /* ============================================================
    Legal pages (Terms / Privacy) — plain long-form text inside the
