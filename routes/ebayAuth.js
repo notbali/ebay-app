@@ -116,10 +116,10 @@ router.post('/disconnect', requireAuth, (req, res) => {
 // For Settings' pickers: the seller's real merchant locations and business policies, straight
 // from eBay, so they select what they already recognize instead of hunting for raw IDs.
 router.get('/locations', requireAuth, async (req, res) => {
-  const refreshToken = getRefreshToken(req.user.id);
-  if (!refreshToken) return res.status(400).json({ error: 'Connect your eBay account first' });
-
   try {
+    const refreshToken = getRefreshToken(req.user.id);
+    if (!refreshToken) return res.status(400).json({ error: 'Connect your eBay account first' });
+
     res.json(await listSellerLocations(refreshToken));
   } catch (err) {
     console.error('eBay location lookup failed:', err.message);
@@ -128,16 +128,17 @@ router.get('/locations', requireAuth, async (req, res) => {
 });
 
 router.get('/policies', requireAuth, async (req, res) => {
-  const refreshToken = getRefreshToken(req.user.id);
-  if (!refreshToken) return res.status(400).json({ error: 'Connect your eBay account first' });
-
   try {
+    const refreshToken = getRefreshToken(req.user.id);
+    if (!refreshToken) return res.status(400).json({ error: 'Connect your eBay account first' });
+
     res.json(await listSellerPolicies(refreshToken));
   } catch (err) {
     console.error('eBay policy lookup failed:', err.message);
-    // Most common cause: this connection predates the sell.account.readonly scope. Flag it
-    // distinctly so the dashboard can prompt "reconnect" instead of a generic error.
-    const needsReconnect = /invalid_scope|insufficient|unauthorized/i.test(err.message);
+    // Most common cause: this connection predates the sell.account.readonly scope, or the stored
+    // token is corrupted (e.g. malformed ciphertext). Either way the fix is the same for the
+    // seller, so flag it distinctly so the dashboard can prompt "reconnect" instead of a generic error.
+    const needsReconnect = /invalid_scope|insufficient|unauthorized|malformed encrypted payload/i.test(err.message);
     res.status(needsReconnect ? 409 : 500).json({ error: err.message, needsReconnect });
   }
 });
