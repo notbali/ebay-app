@@ -108,6 +108,22 @@
       <section id="drafts-section">
         <h2 class="reveal-on-load">Voyage Manifest<span class="subhead">Every listing, from port to delivered</span></h2>
         <div id="harbor-board"></div>
+        <div class="manifest-filters">
+          <input type="search" id="manifest-search" placeholder="Search by title&hellip;" aria-label="Search listings by title" />
+          <select id="manifest-status-filter" aria-label="Filter by stage">
+            <option value="">All stages</option>
+            <option value="draft">In Port</option>
+            <option value="reviewed">Ready to Sail</option>
+            <option value="pushed_to_ebay">Delayed at Dock</option>
+            <option value="published">Delivered</option>
+          </select>
+          <select id="manifest-sort" aria-label="Sort listings">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="price_high">Price: high to low</option>
+            <option value="price_low">Price: low to high</option>
+          </select>
+        </div>
         <div id="drafts-list"></div>
       </section>
     </div>

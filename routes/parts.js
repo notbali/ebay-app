@@ -7,6 +7,7 @@ const { publishListing, suggestCategories, getValidConditions } = require('../se
 const { getUserEbayCreds } = require('../services/ebayAccountService');
 const { requireAuth } = require('../middleware/auth');
 const { UPLOAD_DIR, safeUploadFilename, isAllowedImageMimetype, sniffImageFile } = require('../services/uploadService');
+const { listParts } = require('../services/partsService');
 
 const router = express.Router();
 
@@ -106,9 +107,10 @@ router.post('/', upload.array('photos', 12), verifyUploadedImages, async (req, r
   }
 });
 
-// --- List all drafts ---
+// --- List all drafts, optionally filtered/searched/sorted ---
 router.get('/', (req, res) => {
-  const parts = db.prepare('SELECT * FROM parts WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
+  const { status, q, sort } = req.query;
+  const parts = listParts(db, req.user.id, { status, q, sort });
   res.json(parts);
 });
 
