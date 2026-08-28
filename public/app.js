@@ -3,6 +3,8 @@ const statusEl = document.getElementById('upload-status');
 const uploadPanel = document.getElementById('upload-panel');
 const draftsList = document.getElementById('drafts-list');
 const harborBoard = document.getElementById('harbor-board');
+const onboardingChecklist = document.getElementById('onboarding-checklist');
+const onboardingSteps = document.getElementById('onboarding-steps');
 const manifestSearch = document.getElementById('manifest-search');
 const manifestStatusFilter = document.getElementById('manifest-status-filter');
 const manifestSort = document.getElementById('manifest-sort');
@@ -428,6 +430,7 @@ async function loadDrafts() {
   // unfiltered list for it only when a filter is actually narrowing the results.
   const allParts = hasFilters ? await fetchParts(new URLSearchParams()) : filtered;
   renderHarborBoard(allParts);
+  loadOnboardingStatus();
 
   draftsList.innerHTML = '';
 
@@ -459,6 +462,47 @@ manifestSearch.addEventListener('input', () => {
 });
 manifestStatusFilter.addEventListener('change', loadDrafts);
 manifestSort.addEventListener('change', loadDrafts);
+
+// ============================================================
+// Getting-started checklist
+// ============================================================
+const ONBOARDING_STEPS = [
+  { key: 'ebayConnected', label: 'Connect your eBay account' },
+  { key: 'policiesConfigured', label: 'Configure eBay settings (ship-from location & policies)', action: 'settings', actionLabel: 'Open Settings' },
+  { key: 'hasFirstListing', label: 'Prepare your first listing', action: 'upload', actionLabel: 'Add a Listing' },
+  { key: 'hasPublishedListing', label: 'Publish your first listing to eBay' },
+];
+
+async function loadOnboardingStatus() {
+  const status = await (await fetch('/api/onboarding/status')).json();
+  if (status.complete) {
+    onboardingChecklist.hidden = true;
+    return;
+  }
+  onboardingChecklist.hidden = false;
+  onboardingSteps.innerHTML = ONBOARDING_STEPS.map((step) => {
+    const done = !!status[step.key];
+    const actionHtml = !done && step.action
+      ? `<button type="button" class="secondary small" data-onboarding-action="${step.action}">${step.actionLabel}</button>`
+      : '';
+    return `
+      <li class="${done ? 'done' : ''}">
+        <span class="onboarding-check" aria-hidden="true">${done ? '&#10003;' : ''}</span>
+        <span>${escapeAttr(step.label)}</span>
+        ${actionHtml}
+      </li>
+    `;
+  }).join('');
+}
+
+onboardingSteps.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-onboarding-action]');
+  if (!btn) return;
+  if (btn.dataset.onboardingAction === 'settings') openEbaySettingsModal();
+  if (btn.dataset.onboardingAction === 'upload') {
+    document.getElementById('upload-section').scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+  }
+});
 
 function renderDraftCard(part) {
   const card = document.createElement('div');
