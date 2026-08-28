@@ -1,10 +1,14 @@
 const express = require('express');
 const db = require('../db');
-const { hashPassword, verifyPassword, createSessionToken, verifyCookieValue } = require('../services/authService');
 const {
-  parseCookies, setSessionCookie, clearSessionCookie, createSession, destroySessionByToken, getSessionUser, COOKIE_NAME, isAdminEmail,
+  hashPassword, verifyPassword, createSessionToken, hashSessionToken, verifyCookieValue,
+} = require('../services/authService');
+const {
+  parseCookies, setSessionCookie, clearSessionCookie, createSession, destroySessionByToken, getSessionUser,
+  requireAuth, COOKIE_NAME, isAdminEmail,
 } = require('../middleware/auth');
 const { checkRateLimit, resetRateLimit } = require('../services/rateLimitService');
+const { changePassword, deleteAccount } = require('../services/accountService');
 
 const router = express.Router();
 
@@ -84,6 +88,51 @@ router.post('/logout', (req, res) => {
 router.get('/me', (req, res) => {
   const user = getSessionUser(req);
   res.json({ user: user ? { ...user, isAdmin: isAdminEmail(user.email) } : null });
+});
+
+// Keyed by user id (not IP) since the caller is already authenticated - brute-forcing your own
+// current password from a known session is the threat here, not IP-based credential spraying.
+router.post('/change-password', requireAuth, (req, res) => {
+  const rateLimitKey = `change-password:${req.user.id}`;
+  if (!checkRateLimit(rateLimitKey, { maxAttempts: 10, windowMs: 15 * 60 * 1000 })) {
+    return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
+  }
+
+  const currentPassword = String(req.body.currentPassword || '');
+  const newPassword = String(req.body.newPassword || '');
+
+  const cookies = parseCookies(req);
+  const raw = cookies[COOKIE_NAME];
+  const token = raw && verifyCookieValue(raw, process.env.SESSION_SECRET);
+  const keepSessionId = token ? hashSessionToken(token) : null;
+
+  const result = changePassword(db, {
+    userId: req.user.id, currentPassword, newPassword, keepSessionId,
+  });
+
+  if (!result.success) {
+    if (result.error === 'WEAK_NEW_PASSWORD') {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+
+  resetRateLimit(rateLimitKey);
+  res.json({ success: true });
+});
+
+// Requires the current password as confirmation since this is irreversible - there is no undo
+// for deleteAccount.
+router.post('/delete-account', requireAuth, (req, res) => {
+  const password = String(req.body.password || '');
+  const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
+  if (!user || !verifyPassword(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Incorrect password' });
+  }
+
+  deleteAccount(db, req.user.id);
+  clearSessionCookie(res);
+  res.json({ success: true });
 });
 
 module.exports = router;
