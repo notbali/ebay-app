@@ -21,10 +21,10 @@
   font-weight: 500;
   text-decoration: none;
 }
-.landing-nav-link:hover { color: var(--foam); }
+.landing-nav-link:hover { color: var(--text-heading); }
 .landing-nav-cta {
-  background: var(--current);
-  color: var(--abyss);
+  background: var(--accent);
+  color: var(--text-on-accent);
   font-size: 0.9rem;
   font-weight: 600;
   text-decoration: none;
@@ -32,7 +32,7 @@
   border-radius: var(--radius-sm);
   transition: filter var(--dur-fast), box-shadow var(--dur-fast), transform 0.12s ease-out;
 }
-.landing-nav-cta:hover { filter: brightness(1.15); box-shadow: 0 4px 14px rgba(110, 146, 186, 0.35); }
+.landing-nav-cta:hover { filter: brightness(1.15); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
 
 .landing-main { max-width: none; }
 
@@ -42,7 +42,7 @@
   overflow: hidden;
   margin: 0 -1.5rem 2.5rem;
   padding: 4.5rem 1.5rem 5rem;
-  background: linear-gradient(180deg, var(--abyss) 0%, var(--harbor) 100%);
+  background: linear-gradient(180deg, var(--bg) 0%, var(--surface) 100%);
   border: none;
   border-bottom: 1px solid var(--border);
   border-radius: 0;
@@ -59,7 +59,7 @@
 
 .hero-route {
   fill: none;
-  stroke: var(--current);
+  stroke: var(--accent);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-dasharray: 10 14;
@@ -82,8 +82,8 @@
   from { offset-distance: 4%; }
   to { offset-distance: 96%; }
 }
-.hero-ship path:first-child { fill: var(--abyss); stroke: var(--current); stroke-width: 2; stroke-linejoin: round; }
-.hero-ship-sail { fill: var(--current); stroke: none; }
+.hero-ship path:first-child { fill: var(--bg); stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.hero-ship-sail { fill: var(--accent); stroke: none; }
 
 .hero-copy {
   position: relative;
@@ -95,7 +95,7 @@
   text-align: center;
   /* Soft vignette so hero text stays legible wherever a ship happens to be
      crossing underneath it, without boxing the art out of the hero. */
-  background: radial-gradient(ellipse 85% 80% at center, rgba(15, 23, 41, 0.78) 0%, rgba(15, 23, 41, 0.55) 60%, rgba(15, 23, 41, 0) 100%);
+  background: radial-gradient(ellipse 85% 80% at center, color-mix(in srgb, var(--bg) 78%, transparent) 0%, color-mix(in srgb, var(--bg) 55%, transparent) 60%, color-mix(in srgb, var(--bg) 0%, transparent) 100%);
 }
 .hero-eyebrow {
   margin: 0 0 0.75rem;
@@ -103,7 +103,7 @@
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--current);
+  color: var(--accent);
 }
 .hero-title {
   margin: 0 0 1rem;
@@ -132,16 +132,16 @@
   transition: filter var(--dur-fast), box-shadow var(--dur-fast), transform 0.12s ease-out;
 }
 .hero-cta-primary, .final-cta a {
-  background: var(--current);
-  color: var(--abyss);
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
-.hero-cta-primary:hover, .final-cta a:hover { filter: brightness(1.15); box-shadow: 0 4px 14px rgba(110, 146, 186, 0.35); }
+.hero-cta-primary:hover, .final-cta a:hover { filter: brightness(1.15); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
 .hero-cta-secondary {
   background: transparent;
-  color: var(--foam);
-  border: 1px solid var(--tide);
+  color: var(--text-heading);
+  border: 1px solid var(--border-strong);
 }
-.hero-cta-secondary:hover { background: rgba(110, 146, 186, 0.12); }
+.hero-cta-secondary:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .hero-cta-primary:active, .hero-cta-secondary:active, .final-cta a:active, .landing-nav-cta:active { transform: translateY(1px) !important; }
 
 /* ---- Section shell (reuses `section` card look via extra classes on the same element) ---- */
@@ -161,8 +161,8 @@
   width: 1.9rem;
   height: 1.9rem;
   border-radius: 50%;
-  background: rgba(110, 146, 186, 0.14);
-  color: var(--current);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.95rem;
@@ -188,7 +188,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--current);
+  background: var(--accent);
 }
 .trust-list strong { color: var(--text-heading); }
 
@@ -199,7 +199,7 @@
   font-weight: 500;
   padding: 0.4rem 0.9rem;
   border-radius: 999px;
-  background: rgba(110, 146, 186, 0.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   border: 1px solid var(--border);
   color: var(--text-body);
 }
