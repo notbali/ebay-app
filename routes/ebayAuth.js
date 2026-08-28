@@ -49,21 +49,22 @@ router.get('/connect', requireAuth, (req, res) => {
 });
 
 // eBay redirects the browser here after consent - this is a page navigation, not a fetch() call,
-// so failures redirect back into the dashboard with a query flag instead of returning raw JSON.
+// so failures redirect back into the dashboard (now at /app.html - "/" is the marketing landing
+// page) with a query flag instead of returning raw JSON.
 router.get('/callback', async (req, res) => {
   const { code, state, error: oauthError } = req.query;
-  if (oauthError) return res.redirect(`/?ebay=error&reason=${encodeURIComponent(String(oauthError))}`);
+  if (oauthError) return res.redirect(`/app.html?ebay=error&reason=${encodeURIComponent(String(oauthError))}`);
 
   const user = getSessionUser(req);
-  if (!user) return res.redirect('/?ebay=error&reason=not_logged_in');
+  if (!user) return res.redirect('/app.html?ebay=error&reason=not_logged_in');
 
   const verifiedValue = state && verifyCookieValue(String(state), secret());
-  if (!verifiedValue) return res.redirect('/?ebay=error&reason=invalid_state');
+  if (!verifiedValue) return res.redirect('/app.html?ebay=error&reason=invalid_state');
 
   const [stateUserId, stateTs] = verifiedValue.split('.');
-  if (Number(stateUserId) !== user.id) return res.redirect('/?ebay=error&reason=state_mismatch');
-  if (Date.now() - Number(stateTs) > STATE_TTL_MS) return res.redirect('/?ebay=error&reason=state_expired');
-  if (!code) return res.redirect('/?ebay=error&reason=missing_code');
+  if (Number(stateUserId) !== user.id) return res.redirect('/app.html?ebay=error&reason=state_mismatch');
+  if (Date.now() - Number(stateTs) > STATE_TTL_MS) return res.redirect('/app.html?ebay=error&reason=state_expired');
+  if (!code) return res.redirect('/app.html?ebay=error&reason=missing_code');
 
   try {
     const basicAuth = Buffer.from(`${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`).toString('base64');
@@ -79,7 +80,7 @@ router.get('/callback', async (req, res) => {
     });
     if (!tokenRes.ok) {
       console.error('eBay OAuth token exchange failed:', await tokenRes.text());
-      return res.redirect('/?ebay=error&reason=token_exchange_failed');
+      return res.redirect('/app.html?ebay=error&reason=token_exchange_failed');
     }
 
     const data = await tokenRes.json();
@@ -88,10 +89,10 @@ router.get('/callback', async (req, res) => {
       : null;
 
     saveUserEbayTokens(user.id, { refreshToken: data.refresh_token, expiresAt, scope: data.scope });
-    res.redirect('/?ebay=connected');
+    res.redirect('/app.html?ebay=connected');
   } catch (err) {
     console.error('eBay OAuth callback error:', err);
-    res.redirect('/?ebay=error&reason=unexpected');
+    res.redirect('/app.html?ebay=error&reason=unexpected');
   }
 });
 
