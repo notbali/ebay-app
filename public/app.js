@@ -45,99 +45,6 @@ function prefersReducedMotion() {
   return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// ============================================================
-// Ship marks — a ship idling in the bay (ported from the Bali Bay
-// living-logo design: idle bob/drift on a wave, with a brief "impulse"
-// acceleration on hover before easing back to rest). Static single frame
-// under reduced motion. Used for both the header wordmark and the footer
-// mark - each .ship-mark SVG gets its own independent instance.
-// ============================================================
-function initShipMarks() {
-  document.querySelectorAll('.ship-mark').forEach(initShipMark);
-}
-
-function initShipMark(svg) {
-  const num = (el, key, fallback) => {
-    const v = parseFloat(el.dataset[key]);
-    return isNaN(v) ? fallback : v;
-  };
-
-  const ships = Array.from(svg.querySelectorAll('[data-ship]')).map((el, i) => {
-    const wake = el.querySelector('[data-wake]');
-    return {
-      hull: el.querySelector('[data-hull]'),
-      wake,
-      ripples: wake ? Array.from(wake.children) : [],
-      ampX: num(el, 'ampx', 5),
-      ampY: num(el, 'ampy', 1.8),
-      rot: num(el, 'rot', 1.7),
-      per: num(el, 'per', 8),
-      dir: el.dataset.dir === 'left' ? -1 : 1,
-      phase: i * 1.73,
-      impT: -99,
-    };
-  });
-  const waves = Array.from(svg.querySelectorAll('[data-wave]')).map((el) => ({
-    el,
-    speed: num(el, 'speed', 5),
-    per: num(el, 'per', 60),
-    phase: num(el, 'phase', 0),
-  }));
-
-  let currentT = 0;
-  const lockup = svg.parentElement;
-  if (lockup) {
-    lockup.addEventListener('pointerenter', () => {
-      for (const s of ships) {
-        if (currentT - s.impT > 0.9) s.impT = currentT;
-      }
-    });
-  }
-
-  function frame(t) {
-    currentT = t;
-    const TAU = Math.PI * 2;
-    for (const s of ships) {
-      const u = (t - s.impT) / 2.0;
-      let k = 0;
-      if (u >= 0 && u <= 1) k = Math.sin(Math.PI * Math.pow(u, 0.62));
-      const bob = Math.sin((t / s.per) * TAU + s.phase) * s.ampY + Math.sin(t * 1.7 + s.phase) * 0.45;
-      const drift = Math.sin((t / (s.per * 1.7)) * TAU + s.phase * 0.7) * s.ampX;
-      const x = drift + k * s.dir * 15;
-      const y = bob - k * 3.0 + Math.sin(Math.PI * u) * (u >= 0 && u <= 1 ? -0.8 : 0);
-      const rot = Math.sin((t / s.per) * TAU + s.phase + 0.9) * s.rot - k * s.dir * 2.4;
-      if (s.hull) s.hull.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${rot.toFixed(2)})`);
-      if (s.wake) s.wake.setAttribute('transform', `translate(${(x * 0.92).toFixed(2)} ${(bob * 0.35).toFixed(2)})`);
-      // A rare, brief "idle wake" - a narrow smooth spike (high power on a slow sine) so the
-      // ship occasionally leaves a faint trace at rest, instead of a constant idle shimmer.
-      const idleBlip = Math.max(0, Math.sin(t / 17 + s.phase * 2)) ** 26;
-      const n = s.ripples.length;
-      const rate = 0.5 + k * 1.1;
-      for (let i = 0; i < n; i++) {
-        const ph = (t * rate + i / n) % 1;
-        s.ripples[i].setAttribute('transform', `translate(${(-ph * 17 * s.dir).toFixed(2)} ${(ph * 0.8).toFixed(2)})`);
-        s.ripples[i].setAttribute('opacity', ((1 - ph) * (0.1 * idleBlip + k * 0.42)).toFixed(3));
-      }
-    }
-    for (const w of waves) {
-      const dx = -((t * w.speed) % w.per);
-      const dy = Math.sin(t * 0.75 + w.phase) * 0.7;
-      w.el.setAttribute('transform', `translate(${dx.toFixed(2)} ${dy.toFixed(2)})`);
-    }
-  }
-
-  if (prefersReducedMotion()) {
-    frame(0);
-    return;
-  }
-  const t0 = performance.now();
-  function loop(now) {
-    requestAnimationFrame(loop);
-    frame((now - t0) / 1000);
-  }
-  requestAnimationFrame(loop);
-}
-
 // --- Drag & drop / file picker for the "New Part" form ---
 let selectedFiles = [];
 
@@ -1510,7 +1417,6 @@ async function openAccountModal() {
 }
 
 boot();
-initShipMarks();
 initButtonMagnet();
 initCardSpotlight();
 initHeadingReveal();

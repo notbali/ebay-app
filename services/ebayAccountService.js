@@ -5,10 +5,6 @@ function getConnection(userId) {
   return db.prepare('SELECT * FROM ebay_connections WHERE user_id = ?').get(userId) || null;
 }
 
-function isConnected(userId) {
-  return !!getConnection(userId);
-}
-
 // Stores/replaces the tokens from a fresh OAuth authorize-code exchange or a re-consent.
 function saveUserEbayTokens(userId, { refreshToken, expiresAt, scope }) {
   const existing = getConnection(userId);
@@ -73,7 +69,6 @@ function getUserEbayCreds(userId) {
 
 module.exports = {
   getConnection,
-  isConnected,
   saveUserEbayTokens,
   updateUserEbaySettings,
   disconnectUser,

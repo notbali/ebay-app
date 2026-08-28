@@ -36,4 +36,4 @@ function listParts(db, userId, { status, q, sort } = {}) {
   return db.prepare(`SELECT * FROM parts WHERE ${clauses.join(' AND ')} ORDER BY ${orderBy}`).all(...params);
 }
 
-module.exports = { listParts, VALID_STATUSES, VALID_SORTS: Object.keys(SORTS) };
+module.exports = { listParts };
