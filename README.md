@@ -1,25 +1,35 @@
-# Industrial Parts Listing Assistant
+# The Bali Bay
 
-A small full-stack app: upload one or more photos/notes about a part (drag & drop supported) →
-AI identifies it and drafts a title, description, pricing, condition, and item specifics →
-you review and edit everything in a dashboard → one explicit, confirmed click publishes it live
-to eBay.
+A small full-stack app for industrial parts sellers: upload one or more photos/notes about a part
+(drag & drop supported) → AI identifies it and drafts a title, description, pricing, condition,
+and item specifics → you review and edit everything in a dashboard → one explicit, confirmed
+click publishes it live to eBay.
 
 Multi-user: each person creates their own account and connects their **own** eBay seller account
 (via eBay's OAuth consent flow) - nobody shares anyone else's eBay credentials, and everyone only
 ever sees and publishes their own drafts.
+
+Public marketing/landing page at `/`, the actual dashboard (login, eBay connect, listings) lives
+at `/app.html`. There's also a public "What's New" changelog, Privacy/Terms pages, and a standing
+feedback box on every page.
 
 ## Stack
 - Backend: Node.js + Express
 - Accounts: hand-rolled sessions (Node's built-in `crypto` - scrypt password hashing, signed
   session cookies), no session/auth framework dependency
 - DB: SQLite (via Node's built-in `node:sqlite`), file-based, no separate DB server needed
-- Frontend: plain HTML/CSS/JS dashboard (no build step)
+- Frontend: plain HTML/CSS/JS (no build step) - a marketing landing page, an app dashboard, and a
+  few static pages (What's New, Privacy, Terms, 404/500), sharing a light/dark ("Sunrise/Sunset")
+  theme
 - AI: pluggable via `AI_PROVIDER` (`services/aiService.js`) - defaults to Kimi K2.6 via NVIDIA's
   free NIM tier (vision + text, structured JSON output), or Anthropic Claude as a fallback. Shared
   across all sellers (not per-user).
 - Marketplace: eBay Inventory API, authorized per-seller via 3-legged OAuth
 - Photo hosting: Cloudflare R2 (eBay needs a public HTTPS URL to fetch each photo from)
+- Feedback email: [Resend](https://resend.com) (optional - feedback is always saved to the DB
+  regardless of whether email delivery is configured)
+- A single admin account (matched by email against `ADMIN_EMAIL`, not a roles table) can post
+  "What's New" entries and read submitted feedback
 
 ## 1. Install
 
@@ -57,6 +67,16 @@ You'll need:
 - **`PUBLIC_BASE_URL`** — the public HTTPS origin this app is reachable at once deployed (see
   "Exposing this for other sellers" below). Used for the `Secure` cookie flag and the eBay OAuth
   callback URL. Leave unset for pure `localhost` development.
+- **`ADMIN_EMAIL`** — the account (matched by email) that can post "What's New" updates and read
+  submitted feedback via `GET /api/feedback`, and where feedback emails are sent. Must match the
+  email of an account you've actually signed up with — there's no separate roles table.
+- **Feedback email (optional)** — if unset, feedback submitted through the site is still saved to
+  the DB, it just isn't emailed to you:
+  - `RESEND_API_KEY` — a free API key from [resend.com](https://resend.com) (no credit card
+    required for the free tier).
+  - `FEEDBACK_FROM_EMAIL` — optional, defaults to `onboarding@resend.dev`. Without a verified
+    sending domain on the Resend account, mail can only be delivered *to* the address that owns
+    the Resend account — fine as long as that's the same as `ADMIN_EMAIL`.
 - **eBay app credentials** — from your eBay Developer account (developer.ebay.com):
   - `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` — your app's keys. These identify the app itself and
     are shared by every seller who connects - they are **not** a stand-in for any one seller's
@@ -76,6 +96,10 @@ You'll need:
     `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
   - `R2_ACCOUNT_ID` is shown on your Cloudflare dashboard's R2 overview page
   - `R2_PUBLIC_BASE_URL` is the public URL the bucket is served from, no trailing slash
+- **`DATA_DIR` / `UPLOAD_DIR`** (optional) — where the SQLite DB and uploaded photos live.
+  Default to `./data` and `./uploads`, which is correct for local dev. Only override these when
+  deploying somewhere with a persistent disk mounted outside this repo's own directory (see
+  "Deploying to Render" below - `render.yaml` already sets both for you there).
 
 Start with `EBAY_ENV=sandbox` and eBay's sandbox credentials until you've tested the flow
 end-to-end — this avoids any risk of pushing test data into a real store.
@@ -90,9 +114,24 @@ not in `.env` - paste them in from that seller's own eBay Seller Hub → Busines
 npm start
 ```
 
-Visit `http://localhost:3000`, create the first account (it automatically inherits any parts
+Visit `http://localhost:3000` for the landing page, or go straight to
+`http://localhost:3000/app.html` to create the first account (it automatically inherits any parts
 already sitting in the local dev database from before accounts existed), then connect an eBay
-account from the gate screen or Settings.
+account from the gate screen or Settings. An onboarding checklist on the dashboard tracks the
+remaining setup steps (connect eBay, configure business policies, create and publish a first
+listing) until they're all done.
+
+## 4. Tests
+
+```bash
+npm test
+```
+
+Runs Node's built-in test runner (`node --test`) over `test/`. Most of the suite exercises
+`services/*` and `middleware/auth.js` against an isolated in-memory-style DB rather than the real
+one — see the "pure query logic, kept separate from routes/ so it's testable" comment repeated
+across `services/*.js` for why the routes stay thin and the logic lives in testable functions
+underneath them.
 
 ## Exposing this for other sellers
 
@@ -124,37 +163,41 @@ work here). Render and Fly.io both fit; these steps are for Render.
    Render's current pricing page for the cheapest plan that does; `render.yaml` defaults to
    `starter` as a starting point, adjust if needed.
 3. In the Render dashboard: **New → Blueprint**, connect this repo. Render reads `render.yaml`
-   and creates the web service + disk automatically.
+   and creates the web service + disk automatically, including `DATA_DIR`/`UPLOAD_DIR` pointed at
+   the mounted disk.
 4. Fill in the environment variables Render prompts for during Blueprint creation (everything
-   marked `sync: false` in `render.yaml`) - your AI provider key, eBay Client ID/Secret,
-   `TOKEN_ENCRYPTION_KEY` (generate it the same way as in local setup - see `.env.example` -
-   `render.yaml` deliberately doesn't auto-generate this one, since it must be exact 32-byte hex
-   and Render's auto-generated values aren't hex-formatted), and R2 credentials. Leave
-   `EBAY_OAUTH_REDIRECT_URI` and `PUBLIC_BASE_URL` blank for now - you don't know the assigned URL
-   yet.
+   marked `sync: false` in `render.yaml`) - your AI provider key (`NVIDIA_API_KEY`), eBay Client
+   ID/Secret, `TOKEN_ENCRYPTION_KEY` (generate it the same way as in local setup - see
+   `.env.example` - `render.yaml` deliberately doesn't auto-generate this one, since it must be
+   exact 32-byte hex and Render's auto-generated values aren't hex-formatted), `ADMIN_EMAIL`,
+   `RESEND_API_KEY` (optional), and R2 credentials. Leave `EBAY_OAUTH_REDIRECT_URI` and
+   `PUBLIC_BASE_URL` blank for now - you don't know the assigned URL yet.
 5. Deploy. Render assigns a stable `https://<something>.onrender.com` URL (or attach your own
    custom domain).
 6. **Now go back and fill in the two you skipped**: set `PUBLIC_BASE_URL` to that URL, and in your
    eBay Developer Account register/update a RuName with Accept URL
    `<that URL>/api/ebay/callback`, then set `EBAY_OAUTH_REDIRECT_URI` to the resulting RuName.
    Redeploy (or just let Render's env var change trigger one).
-7. Visit the deployed URL and sign up for real - this is a separate account from anything you
-   created during local testing (different database entirely).
+7. Visit the deployed URL and sign up for real (at `/app.html`) - this is a separate account from
+   anything you created during local testing (different database entirely). Sign up with the same
+   email as `ADMIN_EMAIL` if you want that account to be the admin.
 
 Note: a service with an attached disk can't be horizontally scaled on Render - fine for this
-app's scale (also relevant: session state and the login rate limiter are both in-process/in
-memory, so this app assumes a single instance regardless of host).
+app's scale (also relevant: session state and the in-process rate limiters are both
+in-process/in-memory, so this app assumes a single instance regardless of host, and rate-limit
+counters reset on every restart/redeploy).
 
 ## How the review → publish flow works
 
-0. **Sign in and connect eBay** — create an account (or log in), then authorize your own eBay
-   seller account via the "Connect eBay Account" gate. Every draft you create afterward belongs
-   only to your account, and publishing always goes to your eBay store - never anyone else's.
+0. **Sign in and connect eBay** — create an account (or log in) at `/app.html`, then authorize
+   your own eBay seller account via the "Connect eBay Account" gate. Every draft you create
+   afterward belongs only to your account, and publishing always goes to your eBay store - never
+   anyone else's.
 1. **Generate** — uploading photo(s)/notes only calls the AI provider and saves a row in your local
    SQLite DB. Nothing touches eBay at this point.
 2. **Review/edit** — you can edit the title, description, price, condition, photos, and specifics
    directly in the dashboard before anything is sent anywhere. Add or remove photos at any point
-   before publishing.
+   before publishing. Filter/search/sort your drafts by status, title, or price.
 3. **Publish** — one button, gated behind a confirmation dialog that says publishing makes the
    listing live and visible to real buyers immediately. Under the hood this creates/updates the
    eBay inventory item, creates/updates its offer, and publishes it, all in one request.
@@ -170,6 +213,30 @@ click Publish.
 rejects the listing for a fixable reason), the app remembers that item's SKU and offer ID and
 reuses them on your next attempt instead of creating a duplicate. Fix the issue and click Publish
 again.
+
+## Other pages and features
+
+- **Landing page** (`/`, `public/index.html` + `landing.css`/`landing.js`) — public marketing
+  page for signed-out visitors; the "Bali Bay" logo (`brand-nav.js`, shared across every page)
+  routes to the dashboard if you're already logged in, or back here if not.
+- **What's New** (`/updates.html` list, `/update.html?id=` for a single entry) — a public
+  changelog, readable without an account. The admin account posts/deletes entries via
+  `POST`/`DELETE /api/updates` (gated by `requireAdmin`); everyone can `GET` them.
+- **Feedback** (`feedback-widget.js`, mounted in the footer of every page) — a standing box that
+  posts to `POST /api/feedback`. Every submission is saved to the `feedback` table regardless of
+  email delivery; if `ADMIN_EMAIL` and `RESEND_API_KEY` are set, the admin also gets emailed.
+  Rate-limited per logged-in user. The admin reads submissions via `GET /api/feedback`.
+- **Onboarding checklist** — shown on the dashboard until eBay is connected, business policies are
+  configured, and at least one listing has been created and published (`services/onboardingService.js`).
+- **Theme** — light/dark, labeled "Sunrise"/"Sunset" in Settings, with a "system" option that
+  follows the OS preference. Preference is stored in `localStorage`; `theme.js` is isomorphic so
+  the same file is both `require()`-able from tests and loadable via a plain `<script>` tag.
+- **Account settings** — change password (invalidates every other session, keeps the current one
+  alive) and delete account (irreversible, requires re-entering your password; wipes sessions,
+  eBay connection, parts, and feedback for that user) — `POST /api/auth/change-password` and
+  `POST /api/auth/delete-account`.
+- **Error pages** — a branded `404.html`/`500.html` for browser navigation; API routes (`/api/*`)
+  get a JSON `{ error }` body instead, decided by `services/errorPageService.js`.
 
 ## Known things to double check before relying on this for real inventory
 
@@ -192,34 +259,73 @@ again.
 - **Photos require the R2 env vars to be filled in** — each photo is uploaded to your R2 bucket
   right before eBay is called, so publishing will fail if those credentials are missing or wrong.
   Up to 12 photos per listing (eBay's limit).
-- **`/uploads` is not access-controlled** — filenames are randomized but the static route itself
-  doesn't check who's asking, so anyone with a direct file URL can view that photo. Fine for a
-  small beta; worth proxying through an authenticated route before a wider rollout.
+- **`/uploads` is not access-controlled by who's asking** — filenames are randomized and ownership
+  is checked for delete/remove operations, but the static GET route itself doesn't check who's
+  asking, so anyone with a direct file URL can view that photo. Fine for a small beta; worth
+  proxying through an authenticated route before a wider rollout.
 - **Sessions use hand-rolled HMAC-signed cookies**, not a vetted library like `express-session` -
   deliberate, to avoid new dependencies, but worth a second look before scaling past a beta.
+- **Admin is a single email**, not a roles table (`ADMIN_EMAIL`, checked in
+  `middleware/auth.js`'s `requireAdmin`) — fine for one owner, would need real roles to support
+  more than one admin.
+- **Rate limiting is in-process and in-memory** (`services/rateLimitService.js`) — resets on every
+  restart/redeploy, and doesn't share state across instances. Fine for this app's single-instance
+  scale (see the Render deployment note above), not a substitute for a real rate-limiting layer at
+  higher scale.
+- **Feedback email delivery** depends on a verified sending domain in Resend — without one, mail
+  can only be delivered to the address that owns the Resend account, so `ADMIN_EMAIL` needs to
+  match that account for feedback emails to actually arrive (feedback is still saved to the DB
+  either way).
 
 ## Project structure
 
 ```
 ebay-app/
-├── server.js                  # Express app entry point
-├── db.js                      # SQLite schema/setup (users, sessions, ebay_connections, parts)
-├── middleware/auth.js         # Session cookie parsing/signing, requireAuth, getSessionUser
+├── server.js                  # Express app entry point, route mounting, error handling
+├── db.js                      # SQLite schema/setup (users, sessions, ebay_connections, parts,
+│                                 updates, feedback) and in-place migrations for older DBs
+├── render.yaml                 # Render Blueprint (web service + persistent disk)
+├── middleware/
+│   ├── auth.js                # Session cookie parsing/signing, requireAuth, requireAdmin,
+│   │                             getSessionUser, pruneExpiredSessions
+│   └── securityHeaders.js     # Sets baseline security response headers on every request
 ├── routes/
-│   ├── auth.js                # Signup / login / logout / me
+│   ├── auth.js                # Signup / login / logout / me / change-password / delete-account
 │   ├── ebayAuth.js            # Per-seller eBay OAuth: connect, callback, status, settings
-│   └── parts.js                # API routes: upload, list, edit, photos add/remove, publish
-│                                 (every route scoped to the logged-in seller)
+│   ├── parts.js                # API routes: upload, list, edit, photos add/remove, publish
+│   │                             (every route scoped to the logged-in seller)
+│   ├── uploads.js             # Serves uploaded photo files
+│   ├── updates.js             # "What's New": public GET, admin-only POST/DELETE
+│   ├── feedback.js            # Feedback submission (auth'd users) + admin-only GET listing
+│   └── onboarding.js          # Dashboard getting-started checklist status
 ├── services/
 │   ├── authService.js         # Password hashing, session tokens, cookie signing (no deps)
+│   ├── accountService.js      # Change-password / delete-account DB logic
 │   ├── cryptoService.js       # AES-256-GCM encrypt/decrypt for stored eBay refresh tokens
 │   ├── ebayAccountService.js  # Reads/writes each seller's eBay connection + policy settings
 │   ├── aiService.js           # Picks the AI provider below based on AI_PROVIDER
 │   ├── kimiService.js         # Calls Kimi K2.6 (via NVIDIA NIM) to identify part + draft listing
 │   ├── claudeService.js       # Calls Claude API to identify part + draft listing (fallback provider)
 │   ├── ebayService.js         # Calls eBay Inventory API (create/update item+offer, publish)
-│   └── r2Service.js           # Uploads photos to Cloudflare R2 for eBay's imageUrls, per-seller keys
-├── public/                    # Dashboard (HTML/CSS/JS, no build step)
-├── uploads/                    # Uploaded part photos
-└── data/app.db                 # SQLite database (created on first run)
+│   ├── r2Service.js           # Uploads photos to Cloudflare R2 for eBay's imageUrls, per-seller keys
+│   ├── uploadService.js       # Upload dir, filename safety, mimetype/magic-byte checks, ownership
+│   ├── partsService.js        # Listing query logic (filter/search/sort) behind routes/parts.js
+│   ├── onboardingService.js   # Getting-started checklist status logic
+│   ├── updatesService.js      # Single "What's New" entry lookup
+│   ├── emailService.js        # Thin Resend REST API wrapper, used by feedback notifications
+│   ├── rateLimitService.js    # In-process fixed-window rate limiter, keyed by caller-chosen string
+│   └── errorPageService.js    # API-vs-browser detection and error status resolution
+├── public/                    # No build step
+│   ├── index.html, landing.css, landing.js   # Public marketing landing page
+│   ├── app.html, app.js       # Login/signup, eBay connect gate, onboarding, and the dashboard
+│   ├── updates.html, updates.js, update.html, update.js, update-format.js   # What's New
+│   ├── privacy.html, terms.html                                            # Legal pages
+│   ├── 404.html, 500.html                                                  # Error pages
+│   ├── theme.js               # Light/dark ("Sunrise"/"Sunset") theme, isomorphic (test + browser)
+│   ├── brand-nav.js           # Shared logo-click routing (dashboard vs. landing, by login state)
+│   ├── feedback-widget.js     # Standing feedback box mounted in every page's footer
+│   └── styles.css             # Shared styles across all pages
+├── uploads/                    # Uploaded part photos (or UPLOAD_DIR, if set)
+├── data/app.db                 # SQLite database, created on first run (or DATA_DIR, if set)
+└── test/                       # node --test suite over services/* and middleware/auth.js
 ```

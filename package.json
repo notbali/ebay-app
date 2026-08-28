@@ -1,7 +1,7 @@
 {
   "name": "ebay-listing-assistant",
   "version": "1.0.0",
-  "description": "Claude-powered listing assistant for an industrial-parts eBay store",
+  "description": "AI-powered listing assistant for an industrial-parts eBay store",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
