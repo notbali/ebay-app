@@ -9,6 +9,13 @@ function escapeAttr(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+const EXCERPT_LENGTH = 140;
+
+function excerpt(body) {
+  const oneLine = body.replace(/\s+/g, ' ').trim();
+  return oneLine.length > EXCERPT_LENGTH ? `${oneLine.slice(0, EXCERPT_LENGTH).trim()}…` : oneLine;
+}
+
 function renderList(updates) {
   if (updates.length === 0) {
     listEl.innerHTML = '<p class="muted">Nothing posted yet.</p>';
@@ -16,14 +23,14 @@ function renderList(updates) {
   }
 
   listEl.innerHTML = updates.map((u) => `
-    <div class="update-item">
-      <div class="update-item-head">
-        <strong>${escapeAttr(u.title)}</strong>
-        <span class="muted">${new Date(u.created_at).toLocaleDateString()}</span>
-        ${isAdmin ? `<button type="button" class="danger small" data-action="delete-update" data-id="${u.id}">Delete</button>` : ''}
-      </div>
-      <p>${escapeAttr(u.body)}</p>
-    </div>
+    <article class="update-card">
+      <a href="update.html?id=${u.id}" class="update-card-link">
+        <span class="update-card-date">Update: ${formatUpdateDateShort(u.created_at)}</span>
+        <h3>${escapeAttr(u.title)}</h3>
+        <p>${escapeAttr(excerpt(u.body))}</p>
+      </a>
+      ${isAdmin ? `<button type="button" class="danger small" data-action="delete-update" data-id="${u.id}">Delete</button>` : ''}
+    </article>
   `).join('');
 
   listEl.querySelectorAll('[data-action="delete-update"]').forEach((btn) => {

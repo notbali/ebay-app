@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { getUpdateById } = require('../services/updatesService');
 
 const router = express.Router();
 
@@ -9,6 +10,13 @@ const router = express.Router();
 router.get('/', (req, res) => {
   const updates = db.prepare('SELECT id, title, body, created_at FROM updates ORDER BY created_at DESC').all();
   res.json(updates);
+});
+
+// Single entry, for the patch-notes-style detail page linked from the list.
+router.get('/:id', (req, res) => {
+  const update = getUpdateById(db, req.params.id);
+  if (!update) return res.status(404).json({ error: 'Not found' });
+  res.json(update);
 });
 
 router.post('/', requireAuth, requireAdmin, (req, res) => {

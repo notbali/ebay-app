@@ -29,8 +29,13 @@
   <header class="site-header landing-header">
     <div class="site-header-inner landing-header-inner">
       <div class="wordmark">
-        <span class="kicker">THE</span>
-        <h1 class="reveal-on-load">Bali Bay</h1>
+        <a href="/" id="brand-link" class="brand-link" aria-label="The Bali Bay — home">
+          <span class="kicker">THE</span>
+          <span class="brand-row">
+            <h1 class="reveal-on-load">Bali Bay</h1>
+            <span class="beta-badge">Beta</span>
+          </span>
+        </a>
         <svg id="brand-mark" class="brand-mark-svg" viewBox="0 0 200 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" preserveAspectRatio="none">
           <path id="brand-wave-path" class="brand-wave" d="M0 22 q 12.5 -6 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0 t 25 0" />
           <g class="brand-ship-travel">
@@ -129,6 +134,7 @@
     <div id="feedback-widget" class="feedback-widget"></div>
   </footer>
 
+  <script src="brand-nav.js"></script>
   <script src="landing.js"></script>
   <script src="feedback-widget.js"></script>
 </body>
