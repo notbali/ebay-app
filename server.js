@@ -10,6 +10,7 @@ const feedbackRouter = require('./routes/feedback');
 const onboardingRouter = require('./routes/onboarding');
 const { securityHeaders } = require('./middleware/securityHeaders');
 const { pruneExpiredSessions } = require('./middleware/auth');
+const { isApiRequest, statusForError } = require('./services/errorPageService');
 
 const app = express();
 // This app always runs behind a reverse proxy (Cloudflare tunnel locally; the deployment host's
@@ -28,6 +29,24 @@ app.use('/api/parts', partsRouter);
 app.use('/api/updates', updatesRouter);
 app.use('/api/feedback', feedbackRouter);
 app.use('/api/onboarding', onboardingRouter);
+
+// Reached only if nothing above matched - JSON for API callers (matches every other route's
+// error shape), a branded page for everyone else.
+app.use((req, res) => {
+  if (isApiRequest(req.path)) return res.status(404).json({ error: 'Not found' });
+  res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+});
+
+// Generic error handler - must take all 4 args for Express to recognize it as one. Catches
+// anything passed to next(err) (or thrown synchronously in a non-async handler) so a future bug
+// gets a clean response instead of Express's default leaking a stack trace. The unused `next`
+// param is required - Express only treats a 4-arg function as an error handler.
+app.use((err, req, res, next) => {
+  console.error(err);
+  const status = statusForError(err);
+  if (isApiRequest(req.path)) return res.status(status).json({ error: err.message || 'Internal server error' });
+  res.status(status).sendFile(path.join(__dirname, 'public', '500.html'));
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
