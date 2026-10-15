@@ -348,7 +348,7 @@ async function loadDrafts() {
     return;
   }
 
-  const cards = filtered.map(renderDraftCard);
+  const cards = filtered.map((part) => (part.status === 'published' ? renderPublishedEmbedCard(part) : renderDraftCard(part)));
   cards.forEach((card) => {
     card.classList.add('entering');
     draftsList.appendChild(card);
@@ -548,6 +548,64 @@ function renderDraftCard(part) {
   populateConditionOptions(card, part);
   setupDeletePopover(card, part);
   setupSpecificsLedger(card);
+
+  return card;
+}
+
+function formatPriceRange(part) {
+  const low = part.ai_price_low;
+  const high = part.ai_price_high;
+  if (low == null && high == null) return null;
+  if (low == null) return `$${Number(high).toFixed(2)}`;
+  if (high == null || Number(high) === Number(low)) return `$${Number(low).toFixed(2)}`;
+  return `$${Number(low).toFixed(2)} &ndash; $${Number(high).toFixed(2)}`;
+}
+
+// --- Published listings collapse to a lightweight embed instead of the full draft form.
+// Once a part is live on eBay, eBay is the source of truth for it - there's nothing left to
+// review or edit here, so the card just needs enough to recognize the item (thumbnail, title,
+// price, all still read from the local copy saved at publish time) plus a link out to the real
+// listing. The underlying DB row is untouched; this only changes how a published part renders. ---
+function renderPublishedEmbedCard(part) {
+  const card = document.createElement('div');
+  card.className = 'draft-card embed-card';
+
+  const photoPaths = JSON.parse(part.photo_paths_json || '[]');
+  const thumbSrc = photoPaths[0] ? `/${photoPaths[0].replace(/^.*uploads/, 'uploads')}` : null;
+  const priceText = formatPriceRange(part);
+  const listingUrl = part.ebay_listing_id ? `https://www.ebay.com/itm/${part.ebay_listing_id}` : null;
+
+  card.innerHTML = `
+    <div class="card-topline">
+      <span class="badge stage-delivered">Delivered</span>
+      <button type="button" class="delete-trigger" data-action="delete-trigger" title="Delete from dashboard" aria-label="Delete from dashboard" aria-haspopup="true" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M6 4V2.5A.5.5 0 0 1 6.5 2h3a.5.5 0 0 1 .5.5V4M6.5 7.5v4M9.5 7.5v4M3.5 4l.6 8.5a1 1 0 0 0 1 .9h5.8a1 1 0 0 0 1-.9L12.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="delete-popover" data-role="delete-popover">
+        <p>Delete &ldquo;${escapeAttr(part.ai_title || 'this listing')}&rdquo; from your dashboard? This does <strong>not</strong> end the live eBay listing - manage that in Seller Hub.</p>
+        <div class="popover-actions">
+          <button type="button" class="secondary" data-action="cancel-delete">Cancel</button>
+          <button type="button" class="danger" data-action="confirm-delete">Delete</button>
+        </div>
+      </div>
+    </div>
+    ${listingUrl ? `
+      <a class="embed-body" href="${listingUrl}" target="_blank" rel="noopener">
+        <div class="embed-thumb">${thumbSrc ? `<img src="${thumbSrc}" alt="" loading="lazy" />` : ''}</div>
+        <div class="embed-info">
+          <p class="embed-title">${escapeAttr(part.ai_title || 'Untitled listing')}</p>
+          ${priceText ? `<p class="embed-price">${priceText}</p>` : ''}
+          <span class="embed-cta">View live listing on eBay &rarr;</span>
+        </div>
+      </a>
+    ` : `
+      <p class="muted">${escapeAttr(part.ai_title || 'Untitled listing')} &mdash; published, but no eBay listing ID on file.</p>
+    `}
+  `;
+
+  setupDeletePopover(card, part);
 
   return card;
 }
