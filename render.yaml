@@ -48,11 +48,13 @@ services:
 
       # AI provider
       - key: AI_PROVIDER
-        value: kimi
+        value: nvidia
       - key: NVIDIA_API_KEY
         sync: false
+      # Leave NVIDIA_MODEL / NVIDIA_FALLBACK_MODEL unset to use the defaults in
+      # services/nvidiaService.js - a stale value set here would override them.
       # - key: NVIDIA_MODEL
-      #   value: moonshotai/kimi-k2.6
+      #   value: nvidia/nemotron-3.5-super-vl-120b-a12b
 
       # eBay API
       - key: EBAY_ENV

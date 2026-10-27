@@ -21,9 +21,9 @@ feedback box on every page.
 - Frontend: plain HTML/CSS/JS (no build step) - a marketing landing page, an app dashboard, and a
   few static pages (What's New, Privacy, Terms, 404/500), sharing a light/dark ("Sunrise/Sunset")
   theme
-- AI: pluggable via `AI_PROVIDER` (`services/aiService.js`) - defaults to Kimi K2.6 via NVIDIA's
-  free NIM tier (vision + text, structured JSON output), or Anthropic Claude as a fallback. Shared
-  across all sellers (not per-user).
+- AI: pluggable via `AI_PROVIDER` (`services/aiService.js`) - defaults to a free NVIDIA NIM vision
+  model (Nemotron 3.5 Super VL, with an automatic fallback model), or Anthropic Claude as an
+  alternative. Shared across all sellers (not per-user).
 - Marketplace: eBay Inventory API, authorized per-seller via 3-legged OAuth
 - Photo hosting: Cloudflare R2 (eBay needs a public HTTPS URL to fetch each photo from)
 - Feedback email: [Resend](https://resend.com) (optional - feedback is always saved to the DB
@@ -51,10 +51,17 @@ cp .env.example .env
 
 You'll need:
 
-- **AI provider** — set `AI_PROVIDER` to `kimi` (default) or `claude`:
-  - `kimi` uses Moonshot AI's Kimi K2.6 via NVIDIA's free NIM tier — sign up free at
+- **AI provider** — set `AI_PROVIDER` to `nvidia` (default) or `claude` (`kimi` is still accepted
+  as an alias for `nvidia`, from when this provider was Kimi K2.6):
+  - `nvidia` uses a vision model from NVIDIA's free NIM tier — sign up free at
     [build.nvidia.com](https://build.nvidia.com), then Account → API Keys, for `NVIDIA_API_KEY`.
-    Free tier is rate-limited to roughly 40 requests/minute.
+    Free tier is rate-limited to roughly 40 requests/minute, and a draft can take 10-60+ seconds
+    when the queue is busy. The primary model is `NVIDIA_MODEL` (default
+    `nvidia/nemotron-3.5-super-vl-120b-a12b`); if it's retired, errors, or keeps returning
+    unusable output, `NVIDIA_FALLBACK_MODEL` (default `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`)
+    is tried automatically. NVIDIA retires catalog models often - if drafts start failing, list
+    what your key can use (`GET https://integrate.api.nvidia.com/v1/models`) and update
+    `NVIDIA_MODEL`. Only the first 4 photos per draft are sent to the model.
   - `claude` uses Anthropic's API — get `ANTHROPIC_API_KEY` from your
     [Anthropic Console](https://console.anthropic.com/settings/keys). Paid only, no free tier.
 - **Accounts** — `SESSION_SECRET` and `TOKEN_ENCRYPTION_KEY`, each a random 32-byte secret:
@@ -304,8 +311,8 @@ ebay-app/
 │   ├── cryptoService.js       # AES-256-GCM encrypt/decrypt for stored eBay refresh tokens
 │   ├── ebayAccountService.js  # Reads/writes each seller's eBay connection + policy settings
 │   ├── aiService.js           # Picks the AI provider below based on AI_PROVIDER
-│   ├── kimiService.js         # Calls Kimi K2.6 (via NVIDIA NIM) to identify part + draft listing
-│   ├── claudeService.js       # Calls Claude API to identify part + draft listing (fallback provider)
+│   ├── nvidiaService.js       # Calls an NVIDIA NIM vision model (with retry + fallback model) to identify part + draft listing
+│   ├── claudeService.js       # Calls Claude API to identify part + draft listing (alternative provider)
 │   ├── ebayService.js         # Calls eBay Inventory API (create/update item+offer, publish)
 │   ├── r2Service.js           # Uploads photos to Cloudflare R2 for eBay's imageUrls, per-seller keys
 │   ├── uploadService.js       # Upload dir, filename safety, mimetype/magic-byte checks, ownership

@@ -43,7 +43,7 @@ router.use(requireAuth);
 // --- Create a new draft from photo(s) and/or notes ---
 router.post('/', upload.array('photos', 12), verifyUploadedImages, async (req, res) => {
   // If the client cancels (e.g. the dashboard's Cancel button aborts the fetch), stop the
-  // in-flight Claude call and skip saving a draft the seller explicitly walked away from -
+  // in-flight AI call and skip saving a draft the seller explicitly walked away from -
   // otherwise it would silently appear moments later despite "Voyage cancelled" being shown.
   const abortController = new AbortController();
   res.on('close', () => {
