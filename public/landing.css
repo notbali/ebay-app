@@ -1,10 +1,11 @@
 /* ============================================================
-   Landing page — reuses design tokens, cards, and buttons from
-   styles.css. Additions here are landing-only: the hero voyage
-   scene, nav, step grid, trust list, and part pills.
+   Landing page — reuses design tokens, buttons and the paper sheet
+   from styles.css. Additions here are landing-only: the hero title
+   block with its crossing ships, nav, ruled step columns, trust list,
+   and part lines.
    ============================================================ */
 
-.landing-body { padding-bottom: 0; }
+.landing-body { padding-bottom: var(--space-4); }
 
 /* ---- Header nav ---- */
 .landing-header-inner {
@@ -12,41 +13,58 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-4);
 }
-.landing-nav { display: flex; align-items: center; gap: 1.25rem; }
+.landing-nav { display: flex; align-items: center; gap: var(--space-5); }
 .landing-nav-link {
-  color: var(--text-body);
+  color: var(--text-heading);
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   text-decoration: none;
 }
-.landing-nav-link:hover { color: var(--text-heading); }
-.landing-nav-cta {
+.landing-nav-link:hover { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.landing-nav-cta, .hero-cta-primary, .hero-cta-secondary, .final-cta a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.landing-nav-cta, .hero-cta-primary, .final-cta a {
   background: var(--accent);
   color: var(--text-on-accent);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-decoration: none;
-  padding: 0.55rem 1.1rem;
-  border-radius: var(--radius-sm);
-  transition: filter var(--dur-fast), box-shadow var(--dur-fast), transform 0.12s ease-out;
+  border: 1px solid var(--accent-deep);
+  box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 0 3px var(--text-on-accent);
 }
-.landing-nav-cta:hover { filter: brightness(1.15); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
+.landing-nav-cta:hover, .hero-cta-primary:hover, .final-cta a:hover {
+  background: var(--accent-deep);
+  color: var(--text-on-accent);
+  box-shadow: inset 0 0 0 2px var(--accent-deep), inset 0 0 0 3px var(--text-on-accent);
+}
+.hero-cta-secondary {
+  background: transparent;
+  color: var(--text-heading);
+  border: 1.5px solid var(--text-heading);
+}
+.hero-cta-secondary:hover { background: var(--text-heading); color: var(--surface); }
+.hero-cta-primary:active, .hero-cta-secondary:active, .final-cta a:active, .landing-nav-cta:active { transform: translateY(1px); }
 
 .landing-main { max-width: none; }
 
-/* ---- Hero ---- */
+/* ---- Hero: the manifest's title block, with ships crossing the chart behind it ---- */
 .hero {
   position: relative;
   overflow: hidden;
-  margin: 0 -1.5rem 2.5rem;
-  padding: 4.5rem 1.5rem 5rem;
-  background: linear-gradient(180deg, var(--bg) 0%, var(--surface) 100%);
-  border: none;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  box-shadow: none;
+  margin: 0 0 var(--space-5);
+  padding: var(--space-7) var(--space-4) var(--space-8);
 }
 
 .hero-voyage {
@@ -59,14 +77,10 @@
 
 .hero-route {
   fill: none;
-  stroke: var(--accent);
-  stroke-width: 3;
+  stroke: var(--border-strong);
+  stroke-width: 2;
   stroke-linecap: round;
-  stroke-dasharray: 10 14;
-  animation: hero-route-dash 2.2s linear infinite;
-}
-@keyframes hero-route-dash {
-  to { stroke-dashoffset: -48; }
+  stroke-dasharray: 3 12;
 }
 
 .hero-ship-group {
@@ -82,143 +96,146 @@
   from { offset-distance: 4%; }
   to { offset-distance: 96%; }
 }
-.hero-ship path:first-child { fill: var(--bg); stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
-.hero-ship-sail { fill: var(--accent); stroke: none; }
+.hero-ship path:first-child { fill: var(--surface); stroke: var(--text-heading); stroke-width: 2.5; stroke-linejoin: round; }
+.hero-ship-sail { fill: var(--text-heading); stroke: none; }
 
+/* The title block is a sheet laid over the chart: ships pass behind it, text stays legible. */
 .hero-copy {
   position: relative;
   z-index: 1;
-  max-width: 640px;
+  max-width: 40rem;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
-  border-radius: 32px;
+  padding: var(--space-6) var(--space-6) var(--space-5);
   text-align: center;
-  /* Soft vignette so hero text stays legible wherever a ship happens to be
-     crossing underneath it, without boxing the art out of the hero. */
-  background: radial-gradient(ellipse 85% 80% at center, color-mix(in srgb, var(--bg) 78%, transparent) 0%, color-mix(in srgb, var(--bg) 55%, transparent) 60%, color-mix(in srgb, var(--bg) 0%, transparent) 100%);
+  background-color: var(--surface);
+  background-image: var(--grain);
+  border: 1px solid var(--text-heading);
+  outline: 1px solid var(--border-strong);
+  outline-offset: -8px;
 }
 .hero-eyebrow {
-  margin: 0 0 0.75rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  margin: 0 0 var(--space-3);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--accent);
 }
 .hero-title {
-  margin: 0 0 1rem;
-  font-size: clamp(1.9rem, 4.5vw, 3rem);
-  line-height: 1.12;
-  font-weight: 900;
+  margin: 0 0 var(--space-4);
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  line-height: 1.1;
 }
 .hero-sub {
-  margin: 0 auto 2rem;
-  max-width: 520px;
-  font-size: 1.05rem;
-  line-height: 1.55;
-  color: var(--text-body);
-}
-.hero-actions { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; }
-
-.hero-cta-primary, .hero-cta-secondary, .final-cta a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 0.98rem;
-  text-decoration: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--radius-sm);
-  transition: filter var(--dur-fast), box-shadow var(--dur-fast), transform 0.12s ease-out;
-}
-.hero-cta-primary, .final-cta a {
-  background: var(--accent);
-  color: var(--text-on-accent);
-}
-.hero-cta-primary:hover, .final-cta a:hover { filter: brightness(1.15); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
-.hero-cta-secondary {
-  background: transparent;
-  color: var(--text-heading);
-  border: 1px solid var(--border-strong);
-}
-.hero-cta-secondary:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.hero-cta-primary:active, .hero-cta-secondary:active, .final-cta a:active, .landing-nav-cta:active { transform: translateY(1px) !important; }
-
-/* ---- Section shell (reuses `section` card look via extra classes on the same element) ---- */
-.landing-section { max-width: 900px; margin-left: auto; margin-right: auto; }
-
-/* ---- How it works ---- */
-.how-it-works {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1.25rem;
-}
-.how-step { display: flex; flex-direction: column; gap: 0.4rem; }
-.how-step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.9rem;
-  height: 1.9rem;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-.how-step h3 { margin: 0.2rem 0 0; font-size: 1rem; color: var(--text-heading); }
-.how-step p { margin: 0; font-size: 0.88rem; line-height: 1.5; color: var(--text-secondary); }
-
-/* ---- Trust section ---- */
-.trust-lead { font-size: 0.95rem; line-height: 1.55; color: var(--text-body); }
-.trust-list { list-style: none; margin: 1.1rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
-.trust-list li {
-  position: relative;
-  padding-left: 1.4rem;
-  font-size: 0.92rem;
+  margin: 0 auto var(--space-5);
+  max-width: 32rem;
+  font-size: 1.2rem;
   line-height: 1.5;
   color: var(--text-body);
 }
+.hero-actions { display: flex; align-items: center; justify-content: center; gap: var(--space-4); flex-wrap: wrap; }
+
+/* Consignment strip under the hero buttons — the manifest's own column headings, used to say
+   what the product does: who it's consigned to, where it's laden, where it's delivered. */
+.hero-ledger {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: var(--space-5) 0 0;
+  padding: var(--space-3) 0 0;
+  border-top: 3px double var(--border-strong);
+  text-align: left;
+}
+.hero-ledger > div { padding: 0 var(--space-3); }
+.hero-ledger > div + div { border-left: 1px solid var(--border-strong); }
+.hero-ledger dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.hero-ledger dd {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--text-heading);
+}
+
+/* ---- Section shell ---- */
+.landing-section { max-width: none; }
+
+/* ---- How it works: four ruled manifest columns ---- */
+.how-it-works {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+.how-step { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-4) var(--space-4) var(--space-4) 0; }
+.how-step + .how-step { border-left: 1px solid var(--border-strong); padding-left: var(--space-4); }
+.how-step-num {
+  display: block;
+  font-family: var(--font-hand);
+  font-size: 2.8rem;
+  line-height: 1;
+  color: var(--accent);
+}
+.how-step h3 { margin: var(--space-1) 0 0; font-size: 1.3rem; color: var(--text-heading); }
+.how-step p { margin: 0; font-size: 1rem; line-height: 1.5; color: var(--text-body); }
+
+/* ---- Trust section ---- */
+.trust-lead { font-size: 1.1rem; line-height: 1.55; color: var(--text-body); }
+.trust-list { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.trust-list li {
+  position: relative;
+  padding-left: var(--space-5);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+/* Section sign, as a clause marker in a legal instrument. */
 .trust-list li::before {
-  content: "";
+  content: "\00A7";
   position: absolute;
   left: 0;
-  top: 0.5em;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
+  top: 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--accent);
 }
 .trust-list strong { color: var(--text-heading); }
 
-/* ---- Parts pills ---- */
-.parts-pills { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.1rem; }
+/* ---- Parts: set as lines on the manifest, each with a dotted leader ---- */
+.parts-pills { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin-top: var(--space-4); }
 .part-pill {
-  font-size: 0.85rem;
-  font-weight: 500;
-  padding: 0.4rem 0.9rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border: 1px solid var(--border);
-  color: var(--text-body);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  padding: 0 var(--space-1);
+  border-bottom: 1px dotted var(--border-strong);
+  color: var(--text-heading);
 }
 
 /* ---- Final CTA ---- */
 .final-cta { text-align: center; }
-.final-cta h2 { margin-bottom: 1.25rem; }
+.final-cta h2 { margin-bottom: var(--space-5); }
 
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
   .how-it-works { grid-template-columns: repeat(2, 1fr); }
+  .how-step:nth-child(3) { border-left: none; padding-left: 0; }
+  .how-step:nth-child(n + 3) { border-top: 1px solid var(--border-strong); }
 }
 @media (max-width: 640px) {
-  .hero { margin: 0 -1rem 1.5rem; padding: 3rem 1rem 3.5rem; }
+  .hero { padding: var(--space-5) 0 var(--space-6); }
+  .hero-copy { padding: var(--space-5) var(--space-4); }
+  .hero-ledger { grid-template-columns: 1fr; }
+  .hero-ledger > div + div { border-left: none; border-top: 1px solid var(--border-strong); margin-top: var(--space-2); padding-top: var(--space-2); }
   .how-it-works { grid-template-columns: 1fr; }
-  .landing-nav { gap: 0.75rem; }
+  .how-step + .how-step { border-left: none; padding-left: 0; border-top: 1px solid var(--border-strong); }
+  .landing-nav { gap: var(--space-3); }
 }
 
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
-  .hero-route, .hero-ship-group { animation: none !important; }
+  .hero-ship-group { animation: none !important; }
 }

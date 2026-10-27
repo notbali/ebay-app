@@ -3,13 +3,15 @@ const path = require('path');
 const OpenAI = require('openai');
 
 // Free tier via NVIDIA's NIM catalog (build.nvidia.com) - OpenAI-compatible endpoint. Defaults
-// to Moonshot AI's Kimi K2.6, but is overridable via NVIDIA_MODEL because as of 2026-08-18,
-// "moonshotai/kimi-k2.6" 404s ("Function not found for account") for many accounts due to an
-// open NVIDIA-side account provisioning bug (see NVIDIA Developer Forums thread #378046) -
-// unrelated to this integration. .env is currently pinned to a working substitute
-// (nvidia/nemotron-nano-12b-v2-vl) to prove the pipeline end-to-end; switch NVIDIA_MODEL back
-// to moonshotai/kimi-k2.6 once NVIDIA resolves the bug.
-const MODEL = process.env.NVIDIA_MODEL || 'moonshotai/kimi-k2.6';
+// to Meta's Llama 3.2 11B Vision Instruct, overridable via NVIDIA_MODEL. Moonshot AI's
+// "moonshotai/kimi-k2.6" is the intended model but still 404s ("Function not found for account")
+// as of 2026-10-17 due to an open NVIDIA-side account provisioning bug (see NVIDIA Developer
+// Forums thread #378046) - unrelated to this integration. The first substitute tried
+// (nvidia/nemotron-nano-12b-v2-vl) reached end-of-life on 2026-08-26 and 410s now. Confirmed
+// meta/llama-3.2-11b-vision-instruct works (text + actual image understanding) as of 2026-10-17;
+// switch NVIDIA_MODEL back to moonshotai/kimi-k2.6 once NVIDIA resolves the account bug, or to
+// another model if this one is deprecated too - check build.nvidia.com/models for current status.
+const MODEL = process.env.NVIDIA_MODEL || 'meta/llama-3.2-11b-vision-instruct';
 
 const client = new OpenAI({
   apiKey: process.env.NVIDIA_API_KEY,
