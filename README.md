@@ -103,6 +103,10 @@ You'll need:
     `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
   - `R2_ACCOUNT_ID` is shown on your Cloudflare dashboard's R2 overview page
   - `R2_PUBLIC_BASE_URL` is the public URL the bucket is served from, no trailing slash
+- **Database backups** (optional, strongly recommended in production) — see "Backups" below.
+  Set `R2_BACKUP_BUCKET_NAME` to a **separate, private** R2 bucket.
+- **`AI_DAILY_LIMIT`** (optional) — max AI drafts per seller per rolling 24 hours (default 50).
+  Failed generations don't count. Sellers over the limit get a 429 with how long to wait.
 - **`DATA_DIR` / `UPLOAD_DIR`** (optional) — where the SQLite DB and uploaded photos live.
   Default to `./data` and `./uploads`, which is correct for local dev. Only override these when
   deploying somewhere with a persistent disk mounted outside this repo's own directory (see
@@ -193,6 +197,45 @@ Note: a service with an attached disk can't be horizontally scaled on Render - f
 app's scale (also relevant: session state and the in-process rate limiters are both
 in-process/in-memory, so this app assumes a single instance regardless of host, and rate-limit
 counters reset on every restart/redeploy).
+
+## Backups
+
+The whole app's state (accounts, sessions, eBay connections, drafts) is one SQLite file on one
+disk, so a disk failure or a bad deploy would otherwise lose every account. Once configured, the
+server uploads a snapshot of the database to R2 two minutes after startup and then once a day.
+
+**Setup:**
+1. In Cloudflare R2, create a **second bucket** for backups and leave public access **off**. Do not
+   reuse the photo bucket: it's publicly readable, and a backup contains every seller's email,
+   password hash and encrypted eBay token. (The app refuses to back up into the photo bucket.)
+2. Make sure your R2 API token has read **and** write (including list and delete) access to that
+   bucket — widen the existing token, or make a new one and update the `R2_*` keys.
+3. Set `R2_BACKUP_BUCKET_NAME` to the bucket's name (in `.env`, or in Render's dashboard) and
+   restart. The startup log says `Database backups enabled` (or why they're disabled).
+
+Each backup is a consistent snapshot taken while the app is running, integrity-checked before it's
+uploaded, gzipped, and named by UTC date (`backups/app-2026-10-27.db.gz`) — a second run on the same
+day replaces that day's file. Backups older than `BACKUP_RETENTION_DAYS` (default 14) are deleted;
+the job only ever deletes files named like its own backups. A failed backup is logged
+(`Database backup FAILED: ...`) but never crashes the server — worth an occasional look at the logs.
+The R2 bucket is also protected by Cloudflare's at-rest encryption, but anyone with the bucket
+credentials can read your users' emails and password hashes, so treat that API token like a secret.
+
+**Restoring:**
+
+```bash
+node scripts/restore-backup.js                    # list available backups
+node scripts/restore-backup.js latest             # download + verify the newest one
+node scripts/restore-backup.js backups/app-2026-10-27.db.gz /some/path/restored.db
+```
+
+This writes a verified copy (default `restored-app.db` beside the live DB) and never overwrites an
+existing file. To actually switch to it: stop the app, move the current `app.db` aside, copy the
+restored file to `app.db`, start the app. Try a restore once before you need one.
+
+Photos are not part of these backups — they're stored in the upload directory and, for published
+listings, in the photo R2 bucket. Whether Render's own disk snapshots are enabled for your plan is
+worth checking in the Render dashboard as a second layer.
 
 ## How the review → publish flow works
 
@@ -295,6 +338,7 @@ ebay-app/
 ├── middleware/
 │   ├── auth.js                # Session cookie parsing/signing, requireAuth, requireAdmin,
 │   │                             getSessionUser, pruneExpiredSessions
+│   ├── asyncHandler.js        # Forwards async route-handler rejections to Express's error handler
 │   └── securityHeaders.js     # Sets baseline security response headers on every request
 ├── routes/
 │   ├── auth.js                # Signup / login / logout / me / change-password / delete-account
@@ -306,15 +350,19 @@ ebay-app/
 │   ├── feedback.js            # Feedback submission (auth'd users) + admin-only GET listing
 │   └── onboarding.js          # Dashboard getting-started checklist status
 ├── services/
-│   ├── authService.js         # Password hashing, session tokens, cookie signing (no deps)
+│   ├── authService.js         # Async password hashing (scrypt), session tokens, cookie signing (no deps)
 │   ├── accountService.js      # Change-password / delete-account DB logic
+│   ├── userFilesService.js    # Deletes a removed account's photos (local uploads + R2)
+│   ├── aiQuotaService.js      # Per-seller daily + concurrent limits on AI draft generation
+│   ├── backupService.js       # Daily integrity-checked DB snapshots to a private R2 bucket, restore
 │   ├── cryptoService.js       # AES-256-GCM encrypt/decrypt for stored eBay refresh tokens
 │   ├── ebayAccountService.js  # Reads/writes each seller's eBay connection + policy settings
 │   ├── aiService.js           # Picks the AI provider below based on AI_PROVIDER
 │   ├── nvidiaService.js       # Calls an NVIDIA NIM vision model (with retry + fallback model) to identify part + draft listing
 │   ├── claudeService.js       # Calls Claude API to identify part + draft listing (alternative provider)
 │   ├── ebayService.js         # Calls eBay Inventory API (create/update item+offer, publish)
-│   ├── r2Service.js           # Uploads photos to Cloudflare R2 for eBay's imageUrls, per-seller keys
+│   ├── r2Service.js           # Uploads photos to Cloudflare R2 for eBay's imageUrls, per-seller keys; deletes a seller's photos
+│   ├── photoUpload.js         # multer upload middleware + image-signature verification
 │   ├── uploadService.js       # Upload dir, filename safety, mimetype/magic-byte checks, ownership
 │   ├── partsService.js        # Listing query logic (filter/search/sort) behind routes/parts.js
 │   ├── onboardingService.js   # Getting-started checklist status logic
@@ -322,6 +370,8 @@ ebay-app/
 │   ├── emailService.js        # Thin Resend REST API wrapper, used by feedback notifications
 │   ├── rateLimitService.js    # In-process fixed-window rate limiter, keyed by caller-chosen string
 │   └── errorPageService.js    # API-vs-browser detection and error status resolution
+├── scripts/
+│   └── restore-backup.js      # Lists / downloads + verifies a database backup from R2
 ├── public/                    # No build step
 │   ├── index.html, landing.css, landing.js   # Public marketing landing page
 │   ├── app.html, app.js       # Login/signup, eBay connect gate, onboarding, and the dashboard

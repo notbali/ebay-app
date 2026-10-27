@@ -1,23 +1,46 @@
 const crypto = require('crypto');
+const { promisify } = require('util');
 
 // Password hashing via Node's built-in scrypt (no bcrypt dependency, consistent with this app's
 // zero-extra-auth-deps approach). Stored as "<saltHex>:<hashHex>".
-function hashPassword(password) {
+//
+// Uses the async crypto.scrypt (runs on libuv's threadpool) rather than scryptSync: each hash
+// takes tens of milliseconds of CPU, and the sync version froze this single-process server -
+// every other request included - for that whole time on every login and signup. Same algorithm
+// and parameters as before, so hashes already stored in the DB still verify.
+const scrypt = promisify(crypto.scrypt);
+const KEY_LENGTH = 64;
+
+// scrypt spends time proportional to the password's length, so an unbounded password is a cheap
+// way to burn CPU. Generous enough for any passphrase.
+const MAX_PASSWORD_LENGTH = 128;
+
+async function hashPassword(password) {
   const salt = crypto.randomBytes(16);
-  const hash = crypto.scryptSync(password, salt, 64);
+  const hash = await scrypt(password, salt, KEY_LENGTH);
   return `${salt.toString('hex')}:${hash.toString('hex')}`;
 }
 
-function verifyPassword(password, stored) {
+async function verifyPassword(password, stored) {
   const [saltHex, hashHex] = String(stored).split(':');
   if (!saltHex || !hashHex) return false;
   const salt = Buffer.from(saltHex, 'hex');
   const expected = Buffer.from(hashHex, 'hex');
-  const actual = crypto.scryptSync(password, salt, 64);
-  // Lengths always match (scrypt with fixed keylen 64) but timingSafeEqual throws on mismatch,
-  // so guard first rather than let a malformed stored hash crash the request.
-  if (actual.length !== expected.length) return false;
+  // timingSafeEqual throws on a length mismatch, so a malformed stored hash is rejected up front
+  // rather than crashing the request (and without wasting a scrypt run on it).
+  if (expected.length !== KEY_LENGTH) return false;
+  const actual = await scrypt(password, salt, KEY_LENGTH);
   return crypto.timingSafeEqual(actual, expected);
+}
+
+// Login for an email that has no account should take as long as one with a wrong password -
+// otherwise response time reveals which emails are registered. Does a real verification against a
+// throwaway hash (computed once, lazily) and always answers false.
+let dummyHashPromise = null;
+async function dummyVerifyPassword(password) {
+  if (!dummyHashPromise) dummyHashPromise = hashPassword(crypto.randomBytes(16).toString('hex'));
+  await verifyPassword(password, await dummyHashPromise);
+  return false;
 }
 
 // Raw session token goes in the cookie; only its SHA-256 hash is ever stored in the DB, so a
@@ -54,6 +77,8 @@ function verifyCookieValue(signed, secret) {
 module.exports = {
   hashPassword,
   verifyPassword,
+  dummyVerifyPassword,
+  MAX_PASSWORD_LENGTH,
   createSessionToken,
   hashSessionToken,
   signCookieValue,

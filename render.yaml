@@ -81,3 +81,14 @@ services:
         sync: false
       - key: R2_PUBLIC_BASE_URL
         sync: false
+
+      # Daily database backups go to a separate PRIVATE R2 bucket (never the public photo bucket
+      # above) - see README "Backups". Backups stay off while this is blank.
+      - key: R2_BACKUP_BUCKET_NAME
+        sync: false
+      # - key: BACKUP_RETENTION_DAYS
+      #   value: "14"
+
+      # Per-seller cap on AI drafts per rolling 24 hours (default 50).
+      # - key: AI_DAILY_LIMIT
+      #   value: "50"
