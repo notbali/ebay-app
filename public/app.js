@@ -1035,45 +1035,8 @@ function escapeAttr(str) {
 }
 
 // ============================================================
-// Microinteractions — buttons, cards, headings
+// Microinteractions — headings
 // ============================================================
-
-// "Magnetic" buttons: nudge a hovered button a few px toward the cursor, easing back on leave
-// via the button's existing CSS transform transition. Delegated on document so dynamically
-// created buttons (draft cards, modals) work without re-binding. Skipped on touch/coarse
-// pointers (no hover to track) and under reduced motion.
-function initButtonMagnet() {
-  if (prefersReducedMotion()) return;
-  if (window.matchMedia && !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-
-  let activeBtn = null;
-  document.addEventListener('pointermove', (e) => {
-    const btn = e.target.closest('button:not(:disabled)');
-    if (btn !== activeBtn) {
-      if (activeBtn) activeBtn.style.transform = '';
-      activeBtn = btn;
-    }
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const dx = Math.max(-4, Math.min(4, (e.clientX - (rect.left + rect.width / 2)) * 0.15));
-    const dy = Math.max(-3, Math.min(3, (e.clientY - (rect.top + rect.height / 2)) * 0.15));
-    btn.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
-  });
-}
-
-// Cursor-tracked spotlight highlight on draft cards (adapts "Spotlight Card", kept restrained -
-// small radius, low opacity). One delegated listener on the stable list container rather than
-// per-card, so it keeps working across loadDrafts() re-renders without re-binding.
-function initCardSpotlight() {
-  if (prefersReducedMotion()) return;
-  draftsList.addEventListener('pointermove', (e) => {
-    const card = e.target.closest('.draft-card');
-    if (!card) return;
-    const rect = card.getBoundingClientRect();
-    card.style.setProperty('--mx', `${(((e.clientX - rect.left) / rect.width) * 100).toFixed(1)}%`);
-    card.style.setProperty('--my', `${(((e.clientY - rect.top) / rect.height) * 100).toFixed(1)}%`);
-  });
-}
 
 // Fades+lifts persistent headings (header wordmark, section titles) in once when they first
 // enter the viewport - not on every scroll. Dynamically created headings (modals/overlays) use
@@ -1475,6 +1438,4 @@ async function openAccountModal() {
 }
 
 boot();
-initButtonMagnet();
-initCardSpotlight();
 initHeadingReveal();

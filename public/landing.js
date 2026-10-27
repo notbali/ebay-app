@@ -62,29 +62,5 @@ function initHeadingReveal() {
   els.forEach((el) => observer.observe(el));
 }
 
-// "Magnetic" CTAs: nudge a hovered button a few px toward the cursor, easing back on leave
-// via the button's existing CSS transform transition - same mechanic as the app's
-// initButtonMagnet, retargeted at the landing page's <a>-tag CTAs since it isn't wired to
-// <button> elements. Skipped on touch/coarse pointers and under reduced motion.
-function initButtonMagnet() {
-  if (prefersReducedMotion()) return;
-  if (window.matchMedia && !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-
-  let activeBtn = null;
-  document.addEventListener('pointermove', (e) => {
-    const btn = e.target.closest('.hero-cta-primary, .hero-cta-secondary, .landing-nav-cta');
-    if (btn !== activeBtn) {
-      if (activeBtn) activeBtn.style.transform = '';
-      activeBtn = btn;
-    }
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const dx = Math.max(-4, Math.min(4, (e.clientX - (rect.left + rect.width / 2)) * 0.15));
-    const dy = Math.max(-3, Math.min(3, (e.clientY - (rect.top + rect.height / 2)) * 0.15));
-    btn.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
-  });
-}
-
 initHeroVoyage();
 initHeadingReveal();
-initButtonMagnet();
