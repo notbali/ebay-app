@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const db = require('../db');
 const { generateListing } = require('../services/aiService');
+const { runWithDraftQuota, quotaRefusal } = require('../services/aiQuotaService');
 const { publishListing, suggestCategories, getValidConditions } = require('../services/ebayService');
 const { getUserEbayCreds } = require('../services/ebayAccountService');
 const { requireAuth } = require('../middleware/auth');
@@ -24,12 +25,32 @@ router.post('/', upload.array('photos', 12), verifyUploadedImages, async (req, r
     if (!res.writableEnded) abortController.abort();
   });
 
+  const imagePaths = (req.files || []).map((f) => f.path);
+  // multer has already written the photos to disk by the time this handler runs. If no draft ends
+  // up referencing them (quota refusal, AI failure, cancel) they'd be orphaned forever.
+  let draftSaved = false;
+  const removeUploadsIfUnused = () => {
+    if (!draftSaved) imagePaths.forEach((p) => fs.unlink(p, () => {}));
+  };
+
   try {
     const rawInput = req.body.notes || '';
-    const imagePaths = (req.files || []).map((f) => f.path);
 
-    const ai = await generateListing({ imagePaths, rawInput, signal: abortController.signal });
-    if (abortController.signal.aborted) return;
+    // Capped per user (daily + concurrent) so one account can't exhaust the shared model quota;
+    // a generation that fails doesn't count against the user.
+    const outcome = await runWithDraftQuota(
+      db,
+      req.user.id,
+      () => generateListing({ imagePaths, rawInput, signal: abortController.signal }),
+    );
+    if (!outcome.ok) {
+      removeUploadsIfUnused();
+      const refusal = quotaRefusal(outcome);
+      res.set('Retry-After', String(refusal.retryAfterSeconds));
+      return res.status(429).json(refusal);
+    }
+    const ai = outcome.value;
+    if (abortController.signal.aborted) return removeUploadsIfUnused();
 
     // Best-effort: if the category lookup itself fails (eBay API hiccup, no match, etc.), still
     // save the draft - the seller can search for the right category manually in the dashboard.
@@ -40,7 +61,7 @@ router.post('/', upload.array('photos', 12), verifyUploadedImages, async (req, r
     } catch (e) {
       console.error('Category suggestion failed:', e.message);
     }
-    if (abortController.signal.aborted) return;
+    if (abortController.signal.aborted) return removeUploadsIfUnused();
 
     const stmt = db.prepare(`
       INSERT INTO parts (
@@ -72,9 +93,11 @@ router.post('/', upload.array('photos', 12), verifyUploadedImages, async (req, r
       ai.height_in
     );
 
+    draftSaved = true;
     const part = db.prepare('SELECT * FROM parts WHERE id = ?').get(info.lastInsertRowid);
     res.json({ part, notes_for_seller: ai.notes_for_seller });
   } catch (err) {
+    removeUploadsIfUnused();
     if (err.name === 'AbortError') return; // client already gone - nothing to respond to
     console.error(err);
     res.status(500).json({ error: err.message });

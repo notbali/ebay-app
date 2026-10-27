@@ -10,6 +10,9 @@ const feedbackRouter = require('./routes/feedback');
 const onboardingRouter = require('./routes/onboarding');
 const { securityHeaders } = require('./middleware/securityHeaders');
 const { pruneExpiredSessions } = require('./middleware/auth');
+const db = require('./db');
+const { pruneAiUsage } = require('./services/aiQuotaService');
+const { startBackupSchedule } = require('./services/backupService');
 const { isApiRequest, statusForError } = require('./services/errorPageService');
 
 const app = express();
@@ -57,3 +60,11 @@ app.listen(PORT, () => {
 // everything else so the table doesn't grow unbounded from sessions nobody ever presents again.
 pruneExpiredSessions();
 setInterval(pruneExpiredSessions, 60 * 60 * 1000);
+
+// Same idea for the AI-draft usage log: rows older than the 24h window no longer affect any limit.
+pruneAiUsage(db);
+setInterval(() => pruneAiUsage(db), 60 * 60 * 1000);
+
+// Daily off-site snapshot of the database to a private R2 bucket (no-op, with a log line, unless
+// R2_BACKUP_BUCKET_NAME is configured) - see services/backupService.js.
+startBackupSchedule(db);

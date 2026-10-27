@@ -93,6 +93,17 @@ db.exec(`
   );
 `);
 
+// One row per AI draft generated, for the per-user daily limit (services/aiQuotaService.js).
+// created_at is epoch milliseconds, not an ISO string, since it's only ever compared/subtracted.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ai_generations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_ai_generations_user_created ON ai_generations (user_id, created_at);
+`);
+
 // Migrations for DBs created before these columns existed.
 const columns = db.prepare("PRAGMA table_info(parts)").all().map((c) => c.name);
 if (!columns.includes('ai_condition')) {
